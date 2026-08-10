@@ -1,79 +1,132 @@
-# FindIt Marketplace
+# PeekaListing Automotive
 
-FindIt is a Zimbabwe-focused marketplace for discovering, advertising,
-evaluating and contacting sellers of products and services. V1 is an
-independent React/Vite and Supabase application with no Base44 runtime or source
-dependency.
+PeekaListing is a trusted automotive marketplace focused on helping people discover vehicles, evaluate them with better information, connect with sellers, and access relevant automotive services around the purchase and ownership journey.
 
-## Run locally
+This repository is the automotive-first PeekaListing product intended for the initial launch phase.
 
-Prerequisites: Node.js 24, npm, Docker Desktop and Supabase CLI 2.109+.
+## Product scope
 
-```powershell
+The public product is being focused around automotive discovery and trust.
+
+Core surfaces include:
+
+- Vehicle listings
+- Dealerships and private vehicle sellers
+- Automotive businesses and services
+- Search, filters and vehicle discovery
+- Public Peeks and Peek Requests
+- Business profiles and verification flows
+- Messaging
+- Favourites
+- Notifications and Web Push foundations
+- Reporting, moderation and administration
+- Listing media, location and seller information
+
+Other marketplace categories are not part of the initial public automotive launch. Shared platform foundations should remain reusable so additional categories can be introduced later without rebuilding the product.
+
+## Technology
+
+PeekaListing Automotive is a web-first PWA built with:
+
+- React 18
+- Vite 6
+- React Router
+- Supabase Auth
+- PostgreSQL with Row Level Security
+- Supabase Storage
+- Supabase Edge Functions
+- TanStack Query
+- Service worker / PWA infrastructure
+
+The application keeps UI, domain logic and backend/provider access separated through reusable services, repositories, hooks and components.
+
+## Local development
+
+### Requirements
+
+- Node.js 24+
+- npm
+- Docker Desktop for the local Supabase stack
+- Supabase CLI
+
+Install dependencies:
+
+```bash
 npm ci --ignore-scripts
+```
+
+Create the local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Start the local Supabase stack when backend development is required:
+
+```bash
 supabase start
 supabase db reset --local --no-seed
-supabase db lint --local
-supabase test db
-Copy-Item .env.example .env
+```
+
+Use the local public Supabase URL and anon key reported by `supabase status` in `.env`.
+
+Never expose service-role or other privileged secrets through client-side `VITE_` environment variables.
+
+Validate the environment and start the app:
+
+```bash
 npm run validate:env
 npm run dev
 ```
 
-Populate `.env` with the local public Supabase URL/key from `supabase status`.
-Never place a service-role key in a `VITE_` variable.
+## Validation
 
-## Verify
+Run the checks relevant to the change being made. The main repository checks include:
 
-```powershell
-npm run audit:production
+```bash
 npm run lint
 npm run typecheck
-npm run typecheck:migration
 npm run typecheck:active
+npm run typecheck:edge-functions
 npm run test:contracts
-npm run verify:base44-elimination
 npm run build
 ```
 
-Hosted disposable acceptance is run through
-`scripts/run-hosted-acceptance.ps1`; worker credentials and schedules are set
-through `scripts/configure-staging.ps1`. Both scripts require authenticated
-local CLIs and never print secret values.
+Database, authentication, messaging, listing, notification, Peek, recommendation and scale-focused test commands are also available in `package.json` for work affecting those areas.
 
-## Architecture
+Do not weaken tests, security rules or validation simply to make a change pass.
 
-- React 18, Vite and React Router.
-- Supabase Auth and PostgreSQL with RLS.
-- Private listing, marketplace, Peek source, playback, and thumbnail storage.
-- Edge Functions cover trusted media, Peek, recommendations, notifications,
-  expiry, cleanup, health, and maintenance boundaries.
-- Domain services/repositories isolate UI from provider calls.
-- GitHub Actions cover clean database gates, the full Peek production build,
-  staging deployment, hosted acceptance, and bounded worker schedules.
+## Repository structure
 
-## Status and handover
+The main working areas are:
 
-Read these before deployment:
+- `src/` — application UI, hooks, services and domain-facing client code
+- `supabase/` — database migrations, tests and Edge Functions
+- `tests/` — application and contract tests
+- `scripts/` — validation, smoke testing and operational tooling
+- `public/` — static and PWA assets
+- `docs/` — durable architecture, setup and operational documentation
+- `infrastructure/` — infrastructure-related configuration and tooling
 
-- [Project status](PROJECT_STATUS.md)
-- [Production readiness](PRODUCTION_READINESS_REPORT.md)
-- [Migration completion](MIGRATION_COMPLETION_REPORT.md)
-- [Architecture](ARCHITECTURE.md)
-- [Database](docs/DATABASE.md)
-- [Supabase setup](docs/SUPABASE_SETUP.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Backup and recovery](docs/BACKUP_AND_RECOVERY.md)
-- [Environment variables](docs/ENVIRONMENT_VARIABLES.md)
-- [Google and Apple OAuth setup](docs/OAUTH_SETUP.md)
-- [FindIt authentication email templates](docs/EMAIL_TEMPLATES.md)
-- [QA](QA_STATUS.md) and [security review](docs/SECURITY_REVIEW.md)
-- [Solo founder guide](SOLO_FOUNDER_GUIDE.md)
+## Repository rules
 
-The accepted staging release is deployed at
-`https://mmugambiwa14-netizen.github.io/findit-marketplace/`. Peek is enabled in
-the bottom navigation and backend, its workers are active, and all seven
-recommendation policies are enabled on staging. Production remains a separate,
-explicit rollout: its Supabase project is intentionally unchanged and still
-requires a named migration/function window, production secrets and domain,
-SMTP, monitoring, recovery ownership, and final browser/device acceptance.
+`main` is the canonical branch.
+
+Keep the repository small, readable and intentional:
+
+- Avoid permanent integration, checkpoint, backup or agent-specific branches.
+- Use short-lived branches only when isolation is genuinely useful.
+- Prefer coherent commits for completed units of work instead of frequent WIP commits.
+- Do not commit temporary reports, logs, screenshots, build output, archives or debug dumps.
+- Update existing durable documentation instead of creating duplicate reports.
+- Reuse existing systems before introducing parallel implementations.
+
+All AI agents and contributors must read [`AGENTS.md`](AGENTS.md) before making changes. It is the authoritative repository operating contract.
+
+## Current repository state
+
+PeekaListing Automotive is now isolated as its own product repository and is ready for the automotive-focused product pass.
+
+The existing application foundation is present, while repository-specific CI and deployment workflows are intentionally inactive until they are reviewed and configured for this product and its environments.
+
+Development should preserve working platform capabilities while reshaping the customer-facing experience around vehicles, dealerships, automotive services and Peeks.
