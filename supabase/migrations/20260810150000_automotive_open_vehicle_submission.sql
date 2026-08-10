@@ -1,9 +1,9 @@
 begin;
 
 -- Cars are the launch vertical. Active private sellers may submit a vehicle,
--- but the existing listing-creation transaction still creates it in
--- pending_review. Dealer/business approval remains a separate capability and
--- all dormant listing families remain behind the curated publishing gate.
+-- but vehicle publication is deliberately separate from submission. Dealer
+-- approval remains a separate business capability and dormant listing families
+-- retain the curated business-category gate.
 create or replace function private.can_publish_in_category(p_category text)
 returns boolean
 language sql
@@ -31,8 +31,31 @@ $$;
 revoke all on function private.can_publish_in_category(text) from public, anon, authenticated, service_role;
 grant execute on function private.can_publish_in_category(text) to authenticated, service_role;
 
--- Keep the trigger as the authoritative insert boundary. This protects direct
--- SQL/RPC paths in addition to the application service.
+-- The inherited marketplace auto-published every validated pending_review row.
+-- Keep that legacy behavior for dormant, business-gated families, but cars now
+-- remain pending until an administrator uses the existing moderation action.
+create or replace function private.auto_publish_validated_mvp_listing()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'pending_review' and new.kind::text <> 'car' then
+    new.status := 'available';
+    new.moderation_reason := null;
+    new.expires_at := null;
+    new.expiry_notice_sent_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.auto_publish_validated_mvp_listing() from public, anon, authenticated, service_role;
+
+-- Keep the insert trigger as the authoritative publisher boundary. A browser
+-- cannot bypass review by inserting a car directly with status=available or
+-- status=draft: every non-admin automotive insert must enter pending_review.
 create or replace function public.enforce_curated_listing_publisher()
 returns trigger
 language plpgsql
@@ -64,6 +87,11 @@ begin
     ) then
       raise exception 'Active seller account required' using errcode = '42501';
     end if;
+
+    if new.status <> 'pending_review'::public.listing_status then
+      raise exception 'Vehicle submissions must enter review before publication'
+        using errcode = '42501';
+    end if;
     return new;
   end if;
 
@@ -84,7 +112,74 @@ $$;
 
 revoke all on function public.enforce_curated_listing_publisher() from public, anon, authenticated, service_role;
 
+-- The authenticated public owner_transition_listing RPC is an invoker wrapper
+-- around this private implementation after the repository's RPC hardening.
+-- Re-submitting an automotive draft/rejection therefore returns it to review;
+-- the owner can never use the lifecycle RPC to self-approve a car.
+create or replace function private.owner_transition_listing(
+  p_listing_id uuid,
+  p_action text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  listing_row public.listings%rowtype;
+  next_status public.listing_status;
+begin
+  if not public.is_active_user() then
+    raise exception 'active account required' using errcode = '42501';
+  end if;
+  if p_action not in ('submit', 'pause', 'resume', 'unavailable') then
+    raise exception 'invalid owner listing action' using errcode = '22023';
+  end if;
+
+  select * into listing_row
+  from public.listings
+  where id = p_listing_id and seller_id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'listing not found' using errcode = 'P0002';
+  end if;
+
+  if p_action = 'submit' and listing_row.status in ('draft', 'rejected', 'expired', 'unavailable') then
+    if not exists (select 1 from public.listing_media where listing_id = p_listing_id) then
+      raise exception 'at least one validated image is required' using errcode = '22023';
+    end if;
+    next_status := case
+      when listing_row.kind::text = 'car' then 'pending_review'::public.listing_status
+      else 'available'::public.listing_status
+    end;
+  elsif p_action = 'pause' and listing_row.status in ('available', 'under_offer', 'rented') then
+    next_status := 'paused';
+  elsif p_action = 'resume' and listing_row.status = 'paused' then
+    next_status := 'available';
+  elsif p_action = 'unavailable' and listing_row.status in ('available', 'under_offer', 'rented', 'paused') then
+    next_status := 'unavailable';
+  else
+    raise exception 'listing action is not allowed from the current status' using errcode = '22023';
+  end if;
+
+  update public.listings
+  set status = next_status,
+      submitted_at = case when p_action = 'submit' then now() else submitted_at end,
+      moderation_reason = null,
+      expires_at = case when next_status = 'available' then null else expires_at end,
+      expiry_notice_sent_at = case when next_status = 'available' then null else expiry_notice_sent_at end
+  where id = p_listing_id
+  returning * into listing_row;
+
+  return jsonb_build_object('id', listing_row.id, 'kind', listing_row.kind, 'status', listing_row.status);
+end;
+$$;
+
 comment on function public.enforce_curated_listing_publisher() is
-  'Automotive launch publisher boundary: active users may submit cars into moderation; dormant listing families retain business-category approval.';
+  'Automotive launch boundary: active users may submit cars only into pending review; dormant listing families retain business-category approval.';
+comment on function private.auto_publish_validated_mvp_listing() is
+  'Automotive specialization of the legacy auto-publication trigger: cars remain pending review while dormant curated families preserve prior behavior.';
+comment on function private.owner_transition_listing(uuid, text) is
+  'Owner listing lifecycle with automotive resubmission returning cars to pending review instead of self-publication.';
 
 commit;
