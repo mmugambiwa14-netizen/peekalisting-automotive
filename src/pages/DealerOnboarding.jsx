@@ -151,8 +151,10 @@ export default function DealerOnboarding() {
     onError: (error) => toast.error(error.message || 'The information could not be sent.'),
   });
 
+  /** @param {{ input: any, logoChange: any }} variables */
+  const saveDealerProfile = ({ input, logoChange }) => saveOwnerBusinessProfile(user.id, profile?.id, input, logoChange);
   const profileMutation = useMutation({
-    mutationFn: ({ input, logoChange }) => saveOwnerBusinessProfile(user.id, profile?.id, input, logoChange),
+    mutationFn: saveDealerProfile,
     onSuccess: async () => {
       toast.success('Dealer profile saved');
       await refresh();
@@ -257,6 +259,7 @@ export default function DealerOnboarding() {
                 profile={profile}
                 fixedBusinessType="car_dealership"
                 onSubmit={(input, logoChange) => profileMutation.mutate({ input, logoChange })}
+                onCancel={undefined}
                 isPending={profileMutation.isPending}
                 error={profileMutation.error}
               />
