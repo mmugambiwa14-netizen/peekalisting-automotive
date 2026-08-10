@@ -5,17 +5,13 @@
  * in migration 0116. A value that exists here but not in the enum is rejected
  * by Postgres at insert time with an opaque error, so the two are asserted
  * against each other in tests/peekThreadContracts.test.mjs.
- *
- * The order is the order the composer offers them, chosen so the two a buyer
- * reaches for most often -- "what condition is it in" and "does it work" --
- * come first, and the open-ended option comes last.
  */
 
 /**
  * @typedef {Object} PeekRequestCategory
- * @property {string} value    Enum value stored in the database.
- * @property {string} label    Shown in the composer.
- * @property {string} hint     One-line example, so a buyer writes something specific.
+ * @property {string} value
+ * @property {string} label
+ * @property {string} hint
  */
 
 /** @type {ReadonlyArray<PeekRequestCategory>} */
@@ -27,7 +23,7 @@ export const PEEK_REQUEST_CATEGORIES = Object.freeze([
   { value: 'surroundings', label: 'Surroundings', hint: 'Show what is around it' },
   { value: 'availability', label: 'Availability', hint: 'Show current stock or what is included' },
   { value: 'demonstration', label: 'Demonstration', hint: 'Show a specific task being done' },
-  { value: 'documentation', label: 'Documentation', hint: 'Show papers, service history or plates' },
+  { value: 'documentation', label: 'Documentation', hint: 'Show non-sensitive supporting records' },
   { value: 'custom', label: 'Something else', hint: 'Describe what you want to see' },
 ]);
 
@@ -49,10 +45,9 @@ export function peekRequestCategoryLabel(value) {
 }
 
 /**
- * Suggested prompts per category and listing kind. These are the examples the
- * brief lists, mapped to the categories they belong to, so the composer can
- * offer a starting point instead of an empty box -- an empty box is how
- * "show more pics" requests happen.
+ * The automotive prompts deliberately describe observable evidence rather than
+ * asking the seller whether a claim is true. This keeps a Peek useful without
+ * presenting seller-captured video as a mechanical inspection or guarantee.
  *
  * @type {Readonly<Record<string, ReadonlyArray<{category: string, body: string}>>>}
  */
@@ -65,11 +60,15 @@ export const SUGGESTED_REQUESTS = Object.freeze({
     { category: 'availability', body: 'Show where the parking is' },
   ]),
   car: Object.freeze([
-    { category: 'operation', body: 'Show a cold engine start' },
-    { category: 'close_up', body: 'Show the rear tyres and tread' },
-    { category: 'condition', body: 'Show the underside of the vehicle' },
-    { category: 'operation', body: 'Show the dashboard with the engine running' },
-    { category: 'documentation', body: 'Show the service history book' },
+    { category: 'demonstration', body: 'Walk around the exterior slowly in one continuous view' },
+    { category: 'condition', body: 'Show all four tyres and the tread clearly' },
+    { category: 'operation', body: 'Start the engine and show the dashboard and odometer while it is running' },
+    { category: 'close_up', body: 'Show the engine bay clearly' },
+    { category: 'condition', body: 'Show the driver seat, front interior and dashboard condition' },
+    { category: 'condition', body: 'Show the rear seats and interior condition' },
+    { category: 'condition', body: 'Show the boot or load area clearly' },
+    { category: 'close_up', body: 'Show the underside around the front and rear where safely possible' },
+    { category: 'documentation', body: 'Show the service-history book with personal details kept out of frame' },
   ]),
   machinery: Object.freeze([
     { category: 'operation', body: 'Show the machine operating under load' },
@@ -81,7 +80,7 @@ export const SUGGESTED_REQUESTS = Object.freeze({
   service: Object.freeze([
     { category: 'demonstration', body: 'Show an example of previous work' },
     { category: 'availability', body: 'Show the equipment you bring' },
-    { category: 'documentation', body: 'Show your certification' },
+    { category: 'documentation', body: 'Show your certification without exposing private identification details' },
   ]),
 });
 
