@@ -26,7 +26,7 @@ export default function Profile() {
     { icon: Heart, label: 'Saved', description: 'Vehicles and services you want to revisit', to: '/saved' },
     featureFlags.messaging && { icon: MessageCircle, label: 'Chats', description: 'Private vehicle conversations', to: '/chats' },
     featureFlags.essentialNotifications && { icon: Bell, label: 'Notifications', description: 'Marketplace and account updates', to: '/notifications' },
-    featureFlags.businessProfiles && { icon: Store, label: 'Dealer onboarding', description: 'Apply for dealership identity and inventory discovery', to: '/dealer-onboarding' },
+    { icon: Store, label: 'Dealer onboarding', description: 'Apply for dealership identity and inventory discovery', to: '/dealer-onboarding' },
     featureFlags.businessProfiles && { icon: Building2, label: 'Business profile', description: 'Manage your public business presence', to: '/business-profiles' },
   ].filter(Boolean);
 
