@@ -16,7 +16,6 @@ import {
   findLocalPreviewListing,
   findLocalPreviewSuggestions,
   localPreviewListingsEnabled,
-  paginateLocalPreviewListings,
 } from '@/services/localPreviewListings';
 
 const MAX_HOME_RESULTS = 24;
@@ -48,6 +47,34 @@ function normalizeLimit(limit) {
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
+}
+
+function previewSellerType(listing) {
+  const name = String(listing?.seller_name || '').toLowerCase();
+  return /motors|auto|dealers/.test(name) ? 'dealer' : 'private';
+}
+
+function previewCursorValue(listing, sort) {
+  if (sort === 'newest') return listing.created_at;
+  if (sort === 'most_viewed') return String(listing.views);
+  return String(listing.price);
+}
+
+function paginatePreviewAutomotive(rows, request) {
+  const normalizedModel = request.model.toLowerCase();
+  const filtered = rows
+    .filter((listing) => !normalizedModel || String(listing.car_details?.model || '').toLowerCase().includes(normalizedModel))
+    .map((listing) => ({ ...listing, seller_type: previewSellerType(listing) }))
+    .filter((listing) => !request.sellerType || listing.seller_type === request.sellerType);
+  const cursorIndex = request.cursor ? filtered.findIndex((listing) => listing.id === request.cursor.id) : -1;
+  const start = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+  const items = filtered.slice(start, start + request.pageSize);
+  const hasMore = start + items.length < filtered.length;
+  const last = hasMore ? items.at(-1) : null;
+  return {
+    items,
+    nextCursor: last ? { id: last.id, value: previewCursorValue(last, request.sort) } : null,
+  };
 }
 
 export async function getLatestPublicListings(kind, limit) {
@@ -125,21 +152,17 @@ export async function searchPublicListingsPage(input, { signal } = {}) {
   const request = normalizePublicSearchPageRequest(input);
   throwIfAborted(signal);
   if (localPreviewListingsEnabled()) {
-    // Preview fixtures are intentionally USD-only. Preserve truthful currency
-    // behavior instead of relabeling fixture amounts as another currency.
     if (request.currency && request.currency !== 'USD') {
       return { items: [], nextCursor: null };
     }
-    const page = paginateLocalPreviewListings({
+    const rows = filterLocalPreviewListings({
       ...request,
       minPrice: request.minPrice ?? 0,
       maxPrice: request.maxPrice ?? Number.MAX_SAFE_INTEGER,
     });
+    const page = paginatePreviewAutomotive(rows, request);
     return {
-      items: await attachPublicTourSummaries(
-        page.items.map(mapPublicListing),
-        'listing',
-      ),
+      items: await attachPublicTourSummaries(page.items.map(mapPublicListing), 'listing'),
       nextCursor: page.nextCursor,
     };
   }
