@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Bell, Building2, ChevronRight, Heart, HelpCircle, LayoutDashboard, ListChecks,
-  LogOut, MessageCircle, MessageSquareMore, ScrollText, Settings, ShieldCheck,
+  LogOut, MessageCircle, MessageSquareMore, ScrollText, Settings, ShieldCheck, Store,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import BackButton from '@/components/layout/BackButton';
@@ -21,11 +21,12 @@ export default function Profile() {
   if (isLoading) return <div className="relative min-h-screen"><BackButton className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-20" fallback="/" label="Back to Discover" /><ProfilePageSkeleton className="pt-20" /></div>;
 
   const marketplaceLinks = [
-    { icon: ListChecks, label: 'My listings', description: 'Manage posts, availability and enquiries', to: '/my-listings' },
+    { icon: ListChecks, label: 'My listings', description: 'Manage vehicles, availability and enquiries', to: '/my-listings' },
     featureFlags.tours && { icon: MessageSquareMore, label: 'Buyer Peek Requests', description: 'Record visual answers buyers want to see', to: '/peek-requests' },
-    { icon: Heart, label: 'Saved', description: 'Listings you want to revisit', to: '/saved' },
-    featureFlags.messaging && { icon: MessageCircle, label: 'Chats', description: 'Private listing conversations', to: '/chats' },
+    { icon: Heart, label: 'Saved', description: 'Vehicles and services you want to revisit', to: '/saved' },
+    featureFlags.messaging && { icon: MessageCircle, label: 'Chats', description: 'Private vehicle conversations', to: '/chats' },
     featureFlags.essentialNotifications && { icon: Bell, label: 'Notifications', description: 'Marketplace and account updates', to: '/notifications' },
+    featureFlags.businessProfiles && { icon: Store, label: 'Dealer onboarding', description: 'Apply for dealership identity and inventory discovery', to: '/dealer-onboarding' },
     featureFlags.businessProfiles && { icon: Building2, label: 'Business profile', description: 'Manage your public business presence', to: '/business-profiles' },
   ].filter(Boolean);
 
