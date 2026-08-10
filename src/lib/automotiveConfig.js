@@ -49,6 +49,7 @@ function objectValue(value) {
  * Zimbabwe launch visibility is intentionally narrower than the global vehicle
  * ontology. The taxonomy remains capable of motorcycles, trucks, trailers and
  * future markets; this helper only decides what the automotive launch exposes.
+ * Segment concepts such as luxury/classic are facets, not physical families.
  */
 export function isLaunchVehicleTaxonomyNode(node) {
   if (!node || node.marketplaceKind !== AUTOMOTIVE_LISTING_KIND || node.nodeType !== 'category' || !node.isPostable || node.supersededBy) {
@@ -59,6 +60,7 @@ export function isLaunchVehicleTaxonomyNode(node) {
   if (binding.schema !== AUTOMOTIVE_LISTING_KIND || !AUTOMOTIVE_LAUNCH_SUBTYPES.has(binding.subtype)) return false;
   if (defaults.offer_type && defaults.offer_type !== AUTOMOTIVE_LAUNCH_OFFER) return false;
   if (defaults.parts_family) return false;
+  if (Array.isArray(defaults.segments) && defaults.segments.length) return false;
   return true;
 }
 
