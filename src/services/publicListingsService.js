@@ -6,6 +6,7 @@ import {
   findPublicListingsPage,
 } from '@/repositories/publicListingsRepository';
 import { findActiveLocationSuggestions } from '@/repositories/locationsRepository';
+import { attachAutomotiveDealerIdentities } from '@/services/dealerIdentityService';
 import { mapPublicListing } from '@/services/listingMappers';
 import { hydrateListingImages } from '@/services/listingCreationService';
 import { enrichPublicListingCards } from '@/services/listingCardEnrichmentService';
@@ -85,7 +86,8 @@ export async function getPublicListing(kind, id) {
   const [hydrated] = await hydrateListingImages([row]);
   const listing = mapPublicListing(hydrated);
   const [withTour] = await attachPublicTourSummaries([listing], 'listing');
-  return withTour;
+  const [withDealerIdentity] = await attachAutomotiveDealerIdentities([withTour]);
+  return withDealerIdentity;
 }
 
 /**
@@ -125,8 +127,6 @@ export async function searchPublicListingsPage(input, { signal } = {}) {
   const request = normalizePublicSearchPageRequest(input);
   throwIfAborted(signal);
   if (localPreviewListingsEnabled()) {
-    // Preview fixtures are intentionally USD-only. Preserve truthful currency
-    // behavior instead of relabeling fixture amounts as another currency.
     if (request.currency && request.currency !== 'USD') {
       return { items: [], nextCursor: null };
     }
