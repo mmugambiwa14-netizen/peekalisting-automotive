@@ -110,10 +110,11 @@ export async function findPublicListings(request) {
 }
 
 /** Automotive-aware card search. The database still owns bounded filtering,
- * suspension rules, seller-native currency and keyset pagination. */
+ * suspension rules, seller-native currency, authoritative dealer identity and
+ * keyset pagination. */
 export async function findPublicListingsPage(request, signal) {
   assertKind(request.kind);
-  let query = supabase.rpc('public_listing_search_card_page_v2', {
+  let query = supabase.rpc('public_listing_search_card_page_v3', {
     p_kind: request.kind,
     p_country_code: request.countryCode,
     p_currency: request.currency,
@@ -124,6 +125,8 @@ export async function findPublicListingsPage(request, signal) {
     p_max_price: request.maxPrice,
     p_min_bedrooms: request.minBedrooms,
     p_brand: request.brand,
+    p_model: request.model,
+    p_seller_type: request.sellerType,
     p_condition: request.condition,
     p_fuel_type: request.fuelType,
     p_transmission: request.transmission,
