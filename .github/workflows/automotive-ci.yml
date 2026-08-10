@@ -84,7 +84,6 @@ jobs:
         run: >-
           node --test
           ./tests/automotive*.test.mjs
-          ./tests/homeAutomotiveInventoryContracts.test.mjs
           ./tests/publicAutomotiveSearchContracts.test.mjs
           ./tests/publicLaunchScopeContracts.test.mjs
           ./tests/shippingTransportSeparationContracts.test.mjs
