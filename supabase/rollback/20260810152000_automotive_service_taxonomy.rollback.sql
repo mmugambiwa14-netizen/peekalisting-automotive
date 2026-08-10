@@ -1,6 +1,13 @@
 begin;
 
-delete from public.categories
+-- Taxonomy identity rows are durable. Rollback removes the new specializations
+-- from the active public taxonomy without deleting their stable keys, so any
+-- historical service records keep their classification meaning.
+update public.categories
+set is_active = false,
+    is_postable = false,
+    valid_to = coalesce(valid_to, now()),
+    taxonomy_version = taxonomy_version + 1
 where marketplace_kind = 'service'
   and slug in (
     'vehicle_diagnostics','vehicle_valuation','engine_repair','transmission_repair','auto_electrical',
@@ -12,7 +19,8 @@ where marketplace_kind = 'service'
 update public.categories
 set display_label = 'Mechanic',
     description = null,
-    aliases = array_remove(array_remove(array_remove(coalesce(aliases, '{}'::text[]), 'automotive'), 'vehicle services'), 'car services'),
+    aliases = array_remove(array_remove(array_remove(coalesce(aliases, '{}'::text[]), 'automotive'), 'vehicle_services'), 'car_services'),
+    synonyms = array_remove(array_remove(array_remove(coalesce(synonyms, '{}'::text[]), 'automotive services'), 'vehicle services'), 'car services'),
     taxonomy_version = taxonomy_version + 1
 where marketplace_kind = 'service' and slug = 'mechanic';
 
