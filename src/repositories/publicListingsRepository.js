@@ -10,15 +10,6 @@ const DETAIL_SELECT_BY_KIND = {
   machinery: 'machinery_details!inner(machinery_type, brand, model, condition, year, usage_hours)',
 };
 
-// Keep this projection explicit. It is the public marketplace contract, not
-// an unrestricted `select *`, and prevents future private columns from being
-// exposed accidentally when the listings table evolves.
-//
-// Seller contact values are deliberately absent. `anon` has no column grant on
-// contact_phone / contact_whatsapp / contact_email, so requesting them here
-// would fail the whole query for logged-out visitors. Cards only need to know
-// whether a channel exists; the values come from the reveal_listing_contact
-// RPC once the viewer is authenticated. See migration 0109.
 export const PUBLIC_LISTING_SELECT = `
   id,
   kind,
@@ -56,69 +47,29 @@ export const PUBLIC_LISTING_SELECT = `
 `;
 
 function assertKind(kind) {
-  if (!SUPPORTED_KINDS.has(kind)) {
-    throw new TypeError(`Unsupported listing kind: ${kind}`);
-  }
+  if (!SUPPORTED_KINDS.has(kind)) throw new TypeError(`Unsupported listing kind: ${kind}`);
 }
 
-/**
- * Returns the newest public, enquiry-eligible rows for one marketplace category.
- * RLS remains the final visibility boundary; the explicit status predicate is
- * also required so authenticated owners do not see their drafts on Home.
- */
 export async function findLatestAvailableListings(kind, limit) {
   assertKind(kind);
-
-  const { data, error } = await supabase
-    .from('listings')
-    .select(PUBLIC_LISTING_SELECT)
-    .eq('kind', kind)
-    .eq('country_code', LAUNCH_COUNTRY_CODE)
-    .in('status', ['available', 'under_offer'])
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    const repositoryError = new Error(`Unable to load ${kind} listings`);
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
-
+  const { data, error } = await supabase.from('listings').select(PUBLIC_LISTING_SELECT).eq('kind', kind).eq('country_code', LAUNCH_COUNTRY_CODE).in('status', ['available', 'under_offer']).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
+  if (error) throw Object.assign(new Error(`Unable to load ${kind} listings`), { cause: error });
   return data ?? [];
 }
 
 export async function findSavedListingsByIds(listingIds) {
   if (!listingIds.length) return [];
-  const { data, error } = await supabase
-    .from('listings')
-    .select(PUBLIC_LISTING_SELECT)
-    .in('id', listingIds);
-
-  if (error) {
-    const repositoryError = new Error('Unable to load Favourite listings');
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
+  const { data, error } = await supabase.from('listings').select(PUBLIC_LISTING_SELECT).in('id', listingIds);
+  if (error) throw Object.assign(new Error('Unable to load Favourite listings'), { cause: error });
   return data ?? [];
 }
 
 export async function findPublicListingsByIds(listingIds, signal) {
   if (!listingIds.length) return [];
-  let query = supabase
-    .from('listings')
-    .select(PUBLIC_LISTING_SELECT)
-    .in('id', listingIds)
-    .eq('country_code', LAUNCH_COUNTRY_CODE)
-    .in('status', ['available', 'under_offer']);
+  let query = supabase.from('listings').select(PUBLIC_LISTING_SELECT).in('id', listingIds).eq('country_code', LAUNCH_COUNTRY_CODE).in('status', ['available', 'under_offer']);
   if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
-
-  if (error) {
-    const repositoryError = new Error('Unable to load recommended listings');
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
+  if (error) throw Object.assign(new Error('Unable to load recommended listings'), { cause: error });
   return data ?? [];
 }
 
@@ -133,8 +84,6 @@ function escapeLikePattern(value) {
   return value.replace(/[\\%_]/g, '\\$&');
 }
 
-// Retained only for rollback-compatible older clients. The active Search page
-// uses findPublicListingsPage and never requests this exact-count offset path.
 export async function findPublicListings(request) {
   assertKind(request.kind);
   const detailSelect = DETAIL_SELECT_BY_KIND[request.kind];
@@ -155,24 +104,16 @@ export async function findPublicListings(request) {
   }
   if (request.query) query = query.ilike('title', `%${escapeLikePattern(request.query)}%`);
 
-  const { data, error, count } = await query
-    .order(sort.column, { ascending: sort.ascending })
-    .order('id', { ascending: sort.ascending })
-    .range(from, to);
+  const { data, error, count } = await query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: sort.ascending }).range(from, to);
   if (error) throw Object.assign(new Error('Unable to search public listings'), { cause: error });
   return { rows: data ?? [], count: count ?? 0 };
 }
 
-/**
- * Reads one bounded public Search card page through the currency-safe,
- * privacy-safe thin projection. The full public_listing_search_page_v2 RPC
- * remains installed for compatibility and targeted rollback, but is not used
- * by the active Search card path. The database returns limit+1 rows so the
- * service can derive the next cursor without exact counts or deep offsets.
- */
+/** Automotive-aware card search. The database still owns bounded filtering,
+ * suspension rules, seller-native currency and keyset pagination. */
 export async function findPublicListingsPage(request, signal) {
   assertKind(request.kind);
-  let query = supabase.rpc('public_listing_search_card_page_v1', {
+  let query = supabase.rpc('public_listing_search_card_page_v2', {
     p_kind: request.kind,
     p_country_code: request.countryCode,
     p_currency: request.currency,
@@ -186,6 +127,13 @@ export async function findPublicListingsPage(request, signal) {
     p_condition: request.condition,
     p_fuel_type: request.fuelType,
     p_transmission: request.transmission,
+    p_body_type: request.bodyType,
+    p_drivetrain: request.drivetrain,
+    p_import_status: request.importStatus,
+    p_min_year: request.minYear,
+    p_max_year: request.maxYear,
+    p_max_mileage: request.maxMileage,
+    p_peek_only: request.peekOnly,
     p_sort: request.sort,
     p_cursor_value: request.cursor?.value ?? null,
     p_cursor_id: request.cursor?.id ?? null,
@@ -193,36 +141,16 @@ export async function findPublicListingsPage(request, signal) {
   });
   if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
-
-  if (error) {
-    const repositoryError = new Error('Unable to search public listings');
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
-
+  if (error) throw Object.assign(new Error('Unable to search public listings'), { cause: error });
   return data ?? [];
 }
 
 export async function findPublicListingTitleSuggestions(kind, searchTerm, limit = 5, signal = null) {
   assertKind(kind);
-  let query = supabase
-    .from('listings')
-    .select('id, title')
-    .eq('kind', kind)
-    .eq('country_code', LAUNCH_COUNTRY_CODE)
-    .in('status', ['available', 'under_offer'])
-    .ilike('title', `%${escapeLikePattern(searchTerm)}%`)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit);
+  let query = supabase.from('listings').select('id, title').eq('kind', kind).eq('country_code', LAUNCH_COUNTRY_CODE).in('status', ['available', 'under_offer']).ilike('title', `%${escapeLikePattern(searchTerm)}%`).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
   if (signal) query = query.abortSignal(signal);
-
   const { data, error } = await query;
-  if (error) {
-    const repositoryError = new Error('Unable to load listing suggestions');
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
+  if (error) throw Object.assign(new Error('Unable to load listing suggestions'), { cause: error });
   return data ?? [];
 }
 
@@ -267,33 +195,14 @@ export async function findPublicListingById(kind, id) {
     .eq('id', id)
     .eq('country_code', LAUNCH_COUNTRY_CODE)
     .maybeSingle();
-
-  if (error) {
-    const repositoryError = new Error(`Unable to load ${kind} listing`);
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
+  if (error) throw Object.assign(new Error(`Unable to load ${kind} listing`), { cause: error });
   return data ?? null;
 }
 
 export async function findPublicSellerListings(request) {
-  let query = supabase
-    .from('listings')
-    .select(PUBLIC_LISTING_SELECT)
-    .eq('seller_id', request.sellerId)
-    .eq('country_code', LAUNCH_COUNTRY_CODE)
-    .in('status', ['available', 'under_offer']);
-
+  let query = supabase.from('listings').select(PUBLIC_LISTING_SELECT).eq('seller_id', request.sellerId).eq('country_code', LAUNCH_COUNTRY_CODE).in('status', ['available', 'under_offer']);
   query = applyDescendingCreatedAtCursor(query, request.cursor);
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(request.limit + 1);
-
-  if (error) {
-    const repositoryError = new Error('Unable to load seller listings');
-    repositoryError.cause = error;
-    throw repositoryError;
-  }
+  const { data, error } = await query.order('created_at', { ascending: false }).order('id', { ascending: false }).limit(request.limit + 1);
+  if (error) throw Object.assign(new Error('Unable to load seller listings'), { cause: error });
   return data ?? [];
 }
