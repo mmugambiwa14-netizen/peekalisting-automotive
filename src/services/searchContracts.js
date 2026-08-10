@@ -1,5 +1,6 @@
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 import { LAUNCH_COUNTRY_CODE } from '../lib/marketConfig.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SEARCH_KINDS = new Set(['property', 'car', 'machinery']);
 const SEARCH_SORTS = new Set(['newest', 'price_asc', 'price_desc', 'most_viewed']);
 const SEARCH_CURRENCIES = new Set(['USD', 'ZWL', 'ZAR']);
