@@ -27,7 +27,7 @@ test('active Search result pages pass TanStack cancellation into the service', (
 
 test('active Search suggestions pass TanStack cancellation into the service', () => {
   const suggestionsBlock = between(searchPage, 'const { data: suggestions } = useQuery', 'const categorySuggestions = useMemo');
-  assert.match(suggestionsBlock, /queryFn: \(\{ signal \}\) => getPublicSearchSuggestions\(type, suggestionQuery, \{ signal \}\)/);
+  assert.match(suggestionsBlock, /queryFn: \(\{ signal \}\) => getPublicSearchSuggestions\(TYPE, suggestionQuery, \{ signal \}\)/);
   assert.match(searchPage, /useDebouncedValue\(queryInput\.trim\(\)\.slice\(0, 100\), 250\)/);
 });
 
@@ -38,7 +38,7 @@ test('public listing Search propagates cancellation through the thin keyset RPC 
   assert.match(serviceBlock, /enrichPublicListingCards\(cleanRows\)/);
 
   const repositoryBlock = between(listingRepository, 'export async function findPublicListingsPage', 'export async function findPublicListingTitleSuggestions');
-  assert.match(repositoryBlock, /let query = supabase\.rpc\('public_listing_search_card_page_v1'/);
+  assert.match(repositoryBlock, /supabase\.rpc\('public_listing_search_card_page_v3'/);
   assert.match(repositoryBlock, /if \(signal\) query = query\.abortSignal\(signal\)/);
 });
 

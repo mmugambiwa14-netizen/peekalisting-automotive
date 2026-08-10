@@ -4,18 +4,21 @@ import test from 'node:test';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('V2 reuses the mature V1 transaction while the automotive trigger normalizes its legacy live state into review', async () => {
-  const [privateV1, v2, automotive] = await Promise.all([
-    read('supabase/migrations/0101_private_authenticated_rpc_implementations.sql'),
+test('V2 reuses the mature V1 transaction while automotive publication overrides keep cars in review', async () => {
+  const [v1, v2, inheritedPublication, automotive] = await Promise.all([
+    read('supabase/migrations/0021_v1_listing_creation_and_media.sql'),
     read('supabase/migrations/20260808081300_listing_schema_v2_submission.sql'),
+    read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql'),
     read('supabase/migrations/20260810150000_automotive_open_vehicle_submission.sql'),
   ]);
 
-  const privateCreation = privateV1.match(/create or replace function private\.create_v1_listing_submission[\s\S]*?\n\$\$;/)?.[0] || '';
-  assert.ok(privateCreation, 'private V1 listing transaction exists');
-  assert.match(privateCreation, /'available'/);
+  const v1Creation = v1.match(/create or replace function public\.create_v1_listing_submission[\s\S]*?\$\$ language plpgsql security definer set search_path = public, storage;/)?.[0] || '';
+  assert.ok(v1Creation, 'mature V1 listing transaction exists');
+  assert.match(v1Creation, /'pending_review'/);
   assert.match(v2, /private\.create_v1_listing_submission/);
-  assert.match(automotive, /Vehicle submissions must enter review before/);
+  assert.match(inheritedPublication, /if new\.status = 'pending_review' then[\s\S]*new\.status := 'available'/);
+  assert.match(automotive, /if new\.status = 'pending_review' and new\.kind::text <> 'car' then/);
+  assert.match(automotive, /Vehicle submissions must enter review before[\s\S]*publication/);
   assert.match(automotive, /new\.status := 'pending_review'::public\.listing_status/);
   assert.doesNotMatch(automotive, /if new\.status <> 'pending_review'[\s\S]*raise exception/);
 });

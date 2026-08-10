@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const [sqlBoundary, hygiene, migrationWorkflow] = await Promise.all([
   readFile(new URL('../scripts/verify-sql-boundary.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/verify-repository-hygiene.mjs', import.meta.url), 'utf8'),
-  readFile(new URL('../.github/workflows/migration-gates.yml', import.meta.url), 'utf8'),
+  readFile(new URL('../.github/source-workflows/migration-gates.yml', import.meta.url), 'utf8'),
 ]);
 
 // This anchor is deliberately duplicated between the verifier and this test so
@@ -27,6 +27,6 @@ test('repository hygiene deterministically rejects unfinished source markers', (
   assert.match(hygiene, /markerScannedFiles/);
 });
 
-test('clean database CI executes the 0101 pgTAP matrix', () => {
+test('archived clean database source CI retains the 0101 pgTAP matrix', () => {
   assert.match(migrationWorkflow, /v1_private_authenticated_rpc_implementations\.sql/);
 });

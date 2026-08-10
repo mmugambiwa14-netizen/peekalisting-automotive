@@ -73,7 +73,7 @@ test('automotive launch preserves the inherited publisher while holding cars for
   assert.match(inherited, /auto_publish_validated_mvp_listing/);
   assert.match(inherited, /new\.status := 'available'/);
   assert.match(automotive, /new\.status = 'pending_review' and new\.kind::text <> 'car'/);
-  assert.match(automotive, /Vehicle submissions must enter review before publication/);
+  assert.match(automotive, /Vehicle submissions must enter review before[\s\S]*publication/);
   assert.match(automotive, /when listing_row\.kind::text = 'car' then 'pending_review'/);
   assert.match(automotive, /private\.owner_transition_listing/);
 });
@@ -85,7 +85,7 @@ test('public cards details search and seller inventory use available listing bou
   assert.match(publicService, /hydrateListingImages/);
   assert.match(publicRepository, /PUBLIC_LISTING_SELECT/);
   assert.match(publicRepository, /\.in\('status', \['available', 'under_offer'\]\)/);
-  assert.match(publicRepository, /public_listing_search_card_page_v2/);
+  assert.match(publicRepository, /public_listing_search_card_page_v3/);
   assert.match(app, /property\/\:id|property\/:id/);
   assert.match(app, /car\/\:id|car\/:id/);
   assert.match(app, /machinery\/\:id|machinery\/:id/);
@@ -145,7 +145,7 @@ test('listing journey has executable database and hosted certification assets', 
   assert.match(pgTap, /owner can resubmit an unavailable vehicle/);
   assert.match(pgTap, /permanently delete their vehicle/);
   assert.match(automotivePgTap, /private vehicle remains pending until moderation approves publication/);
-  assert.match(automotivePgTap, /private seller cannot insert an already-public vehicle/);
+  assert.match(automotivePgTap, /incoming available Cars state is normalized to pending review/);
   assert.match(v2PgTap, /exact richer fuel value/);
   assert.match(v2PgTap, /idempotent retry cannot mutate/);
   assert.match(runner, /listingPublicationJourneyContracts/);

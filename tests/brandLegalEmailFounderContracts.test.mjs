@@ -34,18 +34,23 @@ const [
   read('index.html'),
 ]);
 
-test('the home experience is Zimbabwe-only and search-led', () => {
+test('the home experience is Zimbabwe-only and automotive search-led', () => {
   assert.doesNotMatch(home, /international|country picker|other countries/i);
   assert.match(pageMetadata, /Zimbabwe/i);
-  assert.match(home, /DiscoverSearch/);
-  assert.match(home, /DiscoverCategoryGrid/);
-  assert.doesNotMatch(home, /getLatestPublicListings|featured|auction/i);
+  assert.match(home, /role="search"/);
+  assert.match(home, /Search make, model or keyword/);
+  assert.match(home, /getLatestPublicListings\('car', 8\)/);
+  assert.match(home, /Newly listed cars/);
+  assert.doesNotMatch(home, /DiscoverCategoryGrid/);
 });
 
-test('desktop top navigation omits the redundant Browse and Services links', () => {
+test('desktop top navigation exposes the automotive launch destinations and Sell action', () => {
   assert.doesNotMatch(topNav, />Browse</);
-  assert.doesNotMatch(topNav, />Services</);
-  assert.match(topNav, /\bPost\b/);
+  for (const label of ["'Cars'", "'Dealers'", "'Services'", "'Peeks'", "'Chats'"]) {
+    assert.match(topNav, new RegExp(`label: ${label}`));
+  }
+  assert.match(topNav, /<span>Sell<\/span>/);
+  assert.doesNotMatch(topNav, /<span>Post<\/span>/);
 });
 
 // The former 'polished FindIt identity' test was removed here (F-049). It asserted

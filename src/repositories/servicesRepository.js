@@ -97,17 +97,22 @@ export async function findPublicServiceById(id) {
   return data ?? null;
 }
 
+/**
+ * @param {string[]} ids
+ * @param {{ signal?: AbortSignal }} [options]
+ */
 export async function findPublicServicesByIds(ids, { signal } = {}) {
   if (!Array.isArray(ids) || ids.length === 0) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from('services')
     .select(PUBLIC_SERVICE_SELECT)
     .in('id', ids)
     .eq('country_code', LAUNCH_COUNTRY_CODE)
     .eq('status', 'active')
     .neq('category', 'legal')
-    .limit(24)
-    .abortSignal(signal);
+    .limit(24);
+  if (signal) query = query.abortSignal(signal);
+  const { data, error } = await query;
   if (error) throw toRepositoryError('Unable to load recommended services', error);
   return data ?? [];
 }

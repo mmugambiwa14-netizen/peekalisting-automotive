@@ -85,7 +85,7 @@ test('vehicle discovery exposes globally useful independent facets through a min
     assert.match(filters, new RegExp(field));
     assert.match(preview, new RegExp(field));
   }
-  assert.match(repository, /public_listing_search_card_page_v2/);
+  assert.match(repository, /public_listing_search_card_page_v3/);
   assert.match(migration, /attributes -> 'values' ->> 'body_type'/);
   assert.match(migration, /attributes -> 'values' ->> 'drivetrain'/);
   assert.match(migration, /attributes -> 'values' ->> 'import_status'/);

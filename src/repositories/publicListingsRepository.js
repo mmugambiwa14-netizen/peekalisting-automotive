@@ -50,8 +50,45 @@ function assertKind(kind) {
   if (!SUPPORTED_KINDS.has(kind)) throw new TypeError(`Unsupported listing kind: ${kind}`);
 }
 
+function automotiveSearchParams(request) {
+  return {
+    p_kind: 'car',
+    p_country_code: request.countryCode ?? LAUNCH_COUNTRY_CODE,
+    p_currency: request.currency ?? '',
+    p_query: request.query ?? '',
+    p_category: request.category ?? '',
+    p_location_id: request.locationId ?? '',
+    p_min_price: request.minPrice ?? null,
+    p_max_price: request.maxPrice ?? null,
+    p_min_bedrooms: null,
+    p_brand: request.brand ?? '',
+    p_model: request.model ?? '',
+    p_seller_type: request.sellerType ?? '',
+    p_condition: request.condition ?? '',
+    p_fuel_type: request.fuelType ?? '',
+    p_transmission: request.transmission ?? '',
+    p_body_type: request.bodyType ?? '',
+    p_drivetrain: request.drivetrain ?? '',
+    p_import_status: request.importStatus ?? '',
+    p_min_year: request.minYear ?? null,
+    p_max_year: request.maxYear ?? null,
+    p_max_mileage: request.maxMileage ?? null,
+    p_peek_only: request.peekOnly ?? false,
+    p_sort: request.sort ?? 'newest',
+    p_cursor_value: request.cursor?.value ?? null,
+    p_cursor_id: request.cursor?.id ?? null,
+    p_limit: request.pageSize,
+  };
+}
+
 export async function findLatestAvailableListings(kind, limit) {
   assertKind(kind);
+  if (kind === 'car') {
+    const { data, error } = await supabase.rpc('public_listing_search_card_page_v3', automotiveSearchParams({ pageSize: limit }));
+    if (error) throw Object.assign(new Error('Unable to load car listings'), { cause: error });
+    return (data ?? []).slice(0, limit).map(({ cursor_value: _cursorValue, ...row }) => row);
+  }
+
   const { data, error } = await supabase.from('listings').select(PUBLIC_LISTING_SELECT).eq('kind', kind).eq('country_code', LAUNCH_COUNTRY_CODE).in('status', ['available', 'under_offer']).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
   if (error) throw Object.assign(new Error(`Unable to load ${kind} listings`), { cause: error });
   return data ?? [];
@@ -114,34 +151,39 @@ export async function findPublicListings(request) {
  * keyset pagination. */
 export async function findPublicListingsPage(request, signal) {
   assertKind(request.kind);
-  let query = supabase.rpc('public_listing_search_card_page_v3', {
-    p_kind: request.kind,
-    p_country_code: request.countryCode,
-    p_currency: request.currency,
-    p_query: request.query,
-    p_category: request.category,
-    p_location_id: request.locationId,
-    p_min_price: request.minPrice,
-    p_max_price: request.maxPrice,
-    p_min_bedrooms: request.minBedrooms,
-    p_brand: request.brand,
-    p_model: request.model,
-    p_seller_type: request.sellerType,
-    p_condition: request.condition,
-    p_fuel_type: request.fuelType,
-    p_transmission: request.transmission,
-    p_body_type: request.bodyType,
-    p_drivetrain: request.drivetrain,
-    p_import_status: request.importStatus,
-    p_min_year: request.minYear,
-    p_max_year: request.maxYear,
-    p_max_mileage: request.maxMileage,
-    p_peek_only: request.peekOnly,
-    p_sort: request.sort,
-    p_cursor_value: request.cursor?.value ?? null,
-    p_cursor_id: request.cursor?.id ?? null,
-    p_limit: request.pageSize,
-  });
+  let query;
+  if (request.kind === 'car') {
+    query = supabase.rpc('public_listing_search_card_page_v3', automotiveSearchParams(request));
+  } else {
+    query = supabase.rpc('public_listing_search_card_page_v3', {
+      p_kind: request.kind,
+      p_country_code: request.countryCode,
+      p_currency: request.currency,
+      p_query: request.query,
+      p_category: request.category,
+      p_location_id: request.locationId,
+      p_min_price: request.minPrice,
+      p_max_price: request.maxPrice,
+      p_min_bedrooms: request.minBedrooms,
+      p_brand: request.brand,
+      p_model: '',
+      p_seller_type: '',
+      p_condition: request.condition,
+      p_fuel_type: request.fuelType,
+      p_transmission: request.transmission,
+      p_body_type: request.bodyType,
+      p_drivetrain: request.drivetrain,
+      p_import_status: request.importStatus,
+      p_min_year: request.minYear,
+      p_max_year: request.maxYear,
+      p_max_mileage: request.maxMileage,
+      p_peek_only: request.peekOnly,
+      p_sort: request.sort,
+      p_cursor_value: request.cursor?.value ?? null,
+      p_cursor_id: request.cursor?.id ?? null,
+      p_limit: request.pageSize,
+    });
+  }
   if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
   if (error) throw Object.assign(new Error('Unable to search public listings'), { cause: error });

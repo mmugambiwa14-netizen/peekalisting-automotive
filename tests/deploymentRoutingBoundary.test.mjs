@@ -9,7 +9,7 @@ const authSource = readFileSync(resolve(projectRoot, 'src/services/authService.j
 const registerSource = readFileSync(resolve(projectRoot, 'src/pages/Register.jsx'), 'utf8');
 const indexSource = readFileSync(resolve(projectRoot, 'index.html'), 'utf8');
 const documentBootstrapSource = readFileSync(resolve(projectRoot, 'src/documentBootstrap.js'), 'utf8');
-const previewWorkflow = readFileSync(resolve(projectRoot, '.github/workflows/peekalisting-preview.yml'), 'utf8');
+const previewWorkflow = readFileSync(resolve(projectRoot, '.github/source-workflows/peekalisting-preview.yml'), 'utf8');
 const deployScript = readFileSync(resolve(projectRoot, 'scripts/deploy-canonical-cloudflare-staging.sh'), 'utf8');
 const redirects = readFileSync(resolve(projectRoot, 'public/_redirects'), 'utf8');
 
@@ -28,7 +28,7 @@ test('all provider-driven auth callbacks use the deployment-aware URL helper', (
   assert.match(authSource, /redirectTo: appUrl\('\/reset-password'\)/);
 });
 
-test('Cloudflare staging restores deep links without a GitHub Pages or Vercel runtime', () => {
+test('archived source staging workflow preserves deep-link deployment safeguards', () => {
   assert.match(previewWorkflow, /branches:\s*\n\s*- main/);
   assert.match(previewWorkflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(previewWorkflow, /name: cloudflare-staging/);

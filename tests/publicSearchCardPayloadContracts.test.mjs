@@ -19,9 +19,9 @@ function activeSearchRepositoryBlock() {
   return repository.slice(start, end);
 }
 
-test('active public Search calls the thin card RPC and retains abortable keysets', () => {
+test('active public Search calls the current thin card RPC and retains abortable keysets', () => {
   const block = activeSearchRepositoryBlock();
-  assert.match(block, /public_listing_search_card_page_v1/);
+  assert.match(block, /public_listing_search_card_page_v3/);
   assert.doesNotMatch(block, /public_listing_search_page_v2/);
   assert.match(block, /p_cursor_value: request\.cursor\?\.value \?\? null/);
   assert.match(block, /p_cursor_id: request\.cursor\?\.id \?\? null/);
