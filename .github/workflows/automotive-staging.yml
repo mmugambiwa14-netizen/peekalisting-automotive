@@ -35,6 +35,7 @@ jobs:
       VITE_PUBLIC_APP_ORIGIN: https://cars-staging.peekalisting.com
       PEEKALISTING_AUTOMOTIVE_STAGING_ORIGIN: https://cars-staging.peekalisting.com
       PEEKALISTING_EXPECTED_PROJECT_REF: ${{ vars.PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF }}
+      FINDIT_EXPECTED_PROJECT_REF: ${{ vars.PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF }}
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_AUTH_GOOGLE_ENABLED: ${{ vars.VITE_AUTH_GOOGLE_ENABLED || 'false' }}
@@ -181,4 +182,4 @@ jobs:
             | jq -e '.success == true' >/dev/null
 
       - name: Verify hosted automotive staging
-        run: npm run verify:cloudflare-staging
+        run: node ./scripts/verify-automotive-staging.mjs
