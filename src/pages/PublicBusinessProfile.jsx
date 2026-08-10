@@ -102,8 +102,8 @@ export default function PublicBusinessProfile() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-primary">{dealer ? 'Vehicle dealer' : 'Business'}</p>
-                <VerifiedBusinessBadge verified={profile.verified} status={profile.verification_status} publicView />
+                <p className="text-sm font-medium text-primary">{dealer ? 'Dealership profile' : 'Business'}</p>
+                {!dealer && <VerifiedBusinessBadge verified={profile.verified} status={profile.verification_status} publicView />}
               </div>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">{profile.company_name}</h1>
               {profile.city && <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{profile.city}</p>}

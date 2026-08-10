@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Building2, Loader2, MapPin, Search, X } from 'lucide-react';
+import { Building2, Loader2, MapPin, Search, Store, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import BackButton from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,10 @@ export default function Dealers() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <BackButton className="-ml-2" fallback="/" label="Back to Discover" />
-          <div className="mt-4 max-w-3xl"><p className="findit-overline">PeekaListing automotive</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Dealers</h1><p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">Browse PeekaListing-approved vehicle businesses and open each dealer's current inventory in one place.</p></div>
+          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl"><p className="findit-overline">PeekaListing automotive</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Dealers</h1><p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">Browse PeekaListing-approved vehicle businesses and open each dealer's current inventory in one place.</p></div>
+            <Button asChild variant="outline" className="min-h-11 shrink-0"><Link to="/dealer-onboarding"><Store className="mr-2 h-4 w-4" />Sell as a dealer</Link></Button>
+          </div>
           <form onSubmit={submit} className="relative mt-5 max-w-2xl" role="search">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input value={input} onChange={(event) => setInput(event.target.value)} placeholder="Search dealer or city" className="h-12 rounded-2xl pl-12 pr-12" aria-label="Search dealers" />
@@ -80,7 +83,7 @@ export default function Dealers() {
             {dealersQuery.hasNextPage && <div className="mt-7 flex justify-center"><Button type="button" variant="outline" className="min-w-48" disabled={dealersQuery.isFetchingNextPage} onClick={() => dealersQuery.fetchNextPage()}>{dealersQuery.isFetchingNextPage ? <><Loader2 className="h-4 w-4 animate-spin" />Loading</> : 'Load more dealers'}</Button></div>}
           </>
         ) : (
-          <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Building2 className="mx-auto h-7 w-7 text-primary" /><h2 className="mt-3 text-lg font-extrabold">{query ? 'No dealers matched that search' : 'Dealer directory is being prepared'}</h2><p className="mt-1 text-sm text-muted-foreground">Approved dealerships will appear here as they onboard.</p></div>
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Building2 className="mx-auto h-7 w-7 text-primary" /><h2 className="mt-3 text-lg font-extrabold">{query ? 'No dealers matched that search' : 'Dealer directory is being prepared'}</h2><p className="mt-1 text-sm text-muted-foreground">Approved dealerships will appear here as they onboard.</p><Button asChild variant="outline" className="mt-4"><Link to="/dealer-onboarding">Start dealer onboarding</Link></Button></div>
         )}
       </main>
     </div>

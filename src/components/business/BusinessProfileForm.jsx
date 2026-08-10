@@ -15,7 +15,14 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other business' },
 ];
 
-export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPending, error }) {
+export default function BusinessProfileForm({
+  profile,
+  onSubmit,
+  onCancel,
+  isPending,
+  error,
+  fixedBusinessType = null,
+}) {
   const logoInputRef = useRef(null);
   const [logoUpload, setLogoUpload] = useState(null);
   const [removeExistingLogo, setRemoveExistingLogo] = useState(false);
@@ -23,7 +30,7 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
   const [logoError, setLogoError] = useState('');
   const [form, setForm] = useState({
     company_name: profile?.company_name ?? '',
-    business_type: profile?.business_type ?? 'other',
+    business_type: fixedBusinessType ?? profile?.business_type ?? 'other',
     phone: profile?.phone ?? '',
     email: profile?.email ?? '',
     website: profile?.website ?? '',
@@ -52,9 +59,7 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
     setUploadingLogo(true);
     setLogoError('');
     try {
-      if (logoUpload?.path) {
-        await removeStagedMarketplaceImage(logoUpload.path, 'business_logo');
-      }
+      if (logoUpload?.path) await removeStagedMarketplaceImage(logoUpload.path, 'business_logo');
       setLogoUpload(await uploadMarketplaceImage(file, 'business_logo'));
       setRemoveExistingLogo(false);
     } catch (failure) {
@@ -73,10 +78,8 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
   };
 
   const cancel = async () => {
-    if (logoUpload?.path) {
-      await removeStagedMarketplaceImage(logoUpload.path, 'business_logo').catch(() => {});
-    }
-    onCancel();
+    if (logoUpload?.path) await removeStagedMarketplaceImage(logoUpload.path, 'business_logo').catch(() => {});
+    onCancel?.();
   };
 
   return (
@@ -84,7 +87,10 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
       className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit(form, { upload: logoUpload, removeExisting: removeExistingLogo });
+        onSubmit(
+          { ...form, business_type: fixedBusinessType ?? form.business_type },
+          { upload: logoUpload, removeExisting: removeExistingLogo },
+        );
       }}
     >
       <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-4">
@@ -121,12 +127,16 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
 
       <div className="space-y-2">
         <Label htmlFor="business-type">Profile type</Label>
-        <Select value={form.business_type} onValueChange={(value) => set('business_type', value)}>
-          <SelectTrigger id="business-type"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {BUSINESS_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {fixedBusinessType ? (
+          <div id="business-type" className="flex h-11 items-center rounded-xl border border-border bg-muted/30 px-3 text-sm font-semibold">Vehicle dealership</div>
+        ) : (
+          <Select value={form.business_type} onValueChange={(value) => set('business_type', value)}>
+            <SelectTrigger id="business-type"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {BUSINESS_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <p className="text-xs text-muted-foreground">Vehicle dealers receive a searchable vehicle inventory page. No special account role is created.</p>
       </div>
 
@@ -144,7 +154,7 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
 
       <div className="space-y-2">
         <Label htmlFor="business-description">Description</Label>
-        <Textarea id="business-description" value={form.description} onChange={(event) => set('description', event.target.value)} maxLength={1000} rows={5} placeholder="What does your business offer?" />
+        <Textarea id="business-description" value={form.description} onChange={(event) => set('description', event.target.value)} maxLength={1000} rows={5} placeholder="What vehicles do you sell, and where can buyers view them?" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -183,7 +193,7 @@ export default function BusinessProfileForm({ profile, onSubmit, onCancel, isPen
       {error && <p className="text-sm text-destructive" role="alert">{error.message || 'We could not save this profile.'}</p>}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        {profile && <Button type="button" variant="outline" onClick={cancel} disabled={isPending || uploadingLogo}>Cancel</Button>}
+        {profile && onCancel && <Button type="button" variant="outline" onClick={cancel} disabled={isPending || uploadingLogo}>Cancel</Button>}
         <Button type="submit" disabled={isPending || uploadingLogo}>{isPending ? 'Saving…' : profile ? 'Save profile' : 'Create profile'}</Button>
       </div>
     </form>

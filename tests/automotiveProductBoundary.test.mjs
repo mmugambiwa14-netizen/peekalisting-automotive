@@ -27,6 +27,10 @@ test('public shell is automotive-first without deleting reusable dormant routes'
   assert.doesNotMatch(topNav, /<span>Post<\/span>/);
   assert.ok(app.includes('path="/post" element={<CreateListing />}'));
   assert.ok(app.includes('path="/dealers" element={<Dealers />}'));
+  assert.ok(app.includes('path="/dealer/:id" element={<PublicBusinessProfile />}'));
+  assert.ok(app.includes('path="/dealer-onboarding" element={<DealerOnboarding />}'));
+  assert.doesNotMatch(app, /featureFlags\.businessProfiles && <Route path="\/dealer\/:id"/);
+  assert.doesNotMatch(app, /featureFlags\.businessProfiles && <Route path="\/dealer-onboarding"/);
   assert.doesNotMatch(app, /BusinessPublishingGate><CreateListing/);
   assert.match(app, /path="\/property\/:id"/);
   assert.match(app, /path="\/machinery\/:id"/);
@@ -86,6 +90,9 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(migration, /attributes -> 'values' ->> 'drivetrain'/);
   assert.match(migration, /attributes -> 'values' ->> 'import_status'/);
   assert.match(migration, /listing_tour_slots/);
+  assert.match(migration, /join public\.listing_tours/);
+  assert.match(migration, /moderation_status = 'approved'/);
+  assert.match(migration, /published_at is not null/);
   assert.match(migration, /p_max_mileage/);
   assert.match(migration, /kind = 'car'::public\.listing_kind/);
   assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
@@ -126,9 +133,12 @@ test('dealers and automotive services reuse existing systems with current approv
   ]);
 
   assert.match(dealersRepository, /public_automotive_dealers_page/);
+  assert.match(dealerMigration, /account\.status = 'active'/);
+  assert.match(dealerMigration, /business_type = 'car_dealership'/);
   assert.match(dealerMigration, /approval\.category = 'car'/);
   assert.match(dealerMigration, /approval\.status = 'approved'/);
   assert.match(dealersPage, /View dealer inventory/);
+  assert.match(dealersPage, /to="\/dealer-onboarding"/);
   assert.match(servicesPage, /const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic'/);
   assert.match(servicesRepository, /contains\('subcategories', \[request\.specialization\]\)/);
   for (const specialization of ['pre_purchase_inspection', 'vehicle_diagnostics', 'tyres_wheels', 'panel_beating', 'vehicle_towing', 'vehicle_transport']) {
@@ -137,4 +147,38 @@ test('dealers and automotive services reuse existing systems with current approv
   assert.match(serviceTaxonomy, /is_active = true/);
   assert.doesNotMatch(serviceRollback, /delete from public\.categories/);
   assert.match(serviceRollback, /is_active = false/);
+});
+
+test('dealer onboarding uses one Cars-only business application state machine', async () => {
+  const [page, profileForm, publishingService, profileService, bootstrap, profilePage, publicProfile] = await Promise.all([
+    source('src/pages/DealerOnboarding.jsx'),
+    source('src/components/business/BusinessProfileForm.jsx'),
+    source('src/services/businessPublishingService.js'),
+    source('src/services/businessProfilesService.js'),
+    source('supabase/migrations/20260807011000_verified_business_profile_bootstrap.sql'),
+    source('src/pages/Profile.jsx'),
+    source('src/pages/PublicBusinessProfile.jsx'),
+  ]);
+
+  assert.match(page, /getMyPublishingAccess/);
+  assert.match(page, /submitBusinessApplication/);
+  assert.match(page, /requestedCategories: \['car'\]/);
+  assert.match(page, /requestAdditionalBusinessCategories\(\['car'\]\)/);
+  assert.match(page, /applicationStatus === 'request_category'/);
+  assert.match(page, /second business application is neither needed nor allowed/);
+  assert.match(page, /existing_application_pending/);
+  assert.match(page, /respondToBusinessApplication/);
+  assert.match(page, /fixedBusinessType="car_dealership"/);
+  assert.match(page, /saveOwnerBusinessProfile/);
+  assert.match(page, /Cars business approval is active/);
+  assert.doesNotMatch(page, /requestedCategories: \['property'|requestedCategories: \['machinery'|requestedCategories: \['service'/);
+  assert.match(profileForm, /fixedBusinessType/);
+  assert.match(publishingService, /submit_business_application/);
+  assert.match(publishingService, /request_additional_business_categories/);
+  assert.match(profileService, /saveOwnerBusinessProfile/);
+  assert.match(bootstrap, /bootstrap_business_profile_verification/);
+  assert.match(bootstrap, /sync_business_profile_verification/);
+  assert.match(profilePage, /Dealer onboarding/);
+  assert.match(publicProfile, /!dealer && <VerifiedBusinessBadge/);
+  assert.match(publicProfile, /Dealership profile/);
 });

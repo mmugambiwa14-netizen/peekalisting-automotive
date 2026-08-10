@@ -36,6 +36,7 @@ const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Home = lazy(() => import('@/pages/Home'));
 const Search = lazy(() => import('@/pages/Search'));
 const Dealers = lazy(() => import('@/pages/Dealers'));
+const DealerOnboarding = lazy(() => import('@/pages/DealerOnboarding'));
 const CreateListing = lazy(() => import('@/pages/CreateListing'));
 const CuratedCreateService = lazy(() => import('@/pages/CuratedCreateService'));
 const Saved = lazy(() => import('@/pages/Saved'));
@@ -166,7 +167,7 @@ const AuthenticatedApp = () => {
           <Route path="/machinery/:id" element={<MachineryDetail />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
           {featureFlags.businessProfiles && <Route path="/business/:id" element={<PublicBusinessProfile />} />}
-          {featureFlags.businessProfiles && <Route path="/dealer/:id" element={<PublicBusinessProfile />} />}
+          <Route path="/dealer/:id" element={<PublicBusinessProfile />} />
           <Route path="/services" element={<Services />} />
           <Route path="/service/:id" element={<ServiceDetail />} />
           {(featureFlags.tours || featureFlags.toursPreview) && <Route path="/peek" element={featureFlags.tours ? <Tours /> : <ToursPlaceholder />} />}
@@ -194,6 +195,7 @@ const AuthenticatedApp = () => {
             {featureFlags.messaging && <Route path="/chats" element={<Inquiries />} />}
             {featureFlags.messaging && <Route path="/chats/:conversationId" element={<Inquiries />} />}
             {featureFlags.businessProfiles && <Route path="/business-profiles" element={<BusinessProfiles />} />}
+            <Route path="/dealer-onboarding" element={<DealerOnboarding />} />
             {featureFlags.essentialNotifications && <Route path="/notifications" element={<NotificationCenter />} />}
           </Route>
         </Route>
