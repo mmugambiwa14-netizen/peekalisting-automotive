@@ -27,7 +27,7 @@ test('active Search result pages pass TanStack cancellation into the service', (
 
 test('active Search suggestions pass TanStack cancellation into the service', () => {
   const suggestionsBlock = between(searchPage, 'const { data: suggestions } = useQuery', 'const categorySuggestions = useMemo');
-  assert.match(suggestionsBlock, /queryFn: \(\{ signal \}\) => getPublicSearchSuggestions\(type, suggestionQuery, \{ signal \}\)/);
+  assert.match(suggestionsBlock, /queryFn: \(\{ signal \}\) => getPublicSearchSuggestions\(TYPE, suggestionQuery, \{ signal \}\)/);
   assert.match(searchPage, /useDebouncedValue\(queryInput\.trim\(\)\.slice\(0, 100\), 250\)/);
 });
 
