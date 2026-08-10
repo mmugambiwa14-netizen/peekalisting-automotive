@@ -32,11 +32,11 @@ export const PRIMARY_NAV_ITEMS = [
     previewFeature: 'toursPreview',
   },
   {
-    label: 'Post',
+    label: 'Sell',
     icon: Plus,
     path: '/post',
     guestAllowed: false,
-    guestAction: 'post a listing',
+    guestAction: 'sell a vehicle',
     prominent: true,
   },
   {
