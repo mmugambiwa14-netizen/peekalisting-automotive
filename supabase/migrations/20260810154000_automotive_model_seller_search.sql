@@ -115,7 +115,8 @@ begin
   end if;
 
   if not exists (
-    select 1 from public.country_configs country
+    select 1
+    from public.country_configs country
     where country.country_code = normalized_country
       and country.operational_state in ('active', 'browse_only')
   ) then
@@ -123,7 +124,8 @@ begin
   end if;
 
   if normalized_currency <> '' and not exists (
-    select 1 from public.country_configs country
+    select 1
+    from public.country_configs country
     where country.country_code = normalized_country
       and normalized_currency = any(country.supported_listing_currencies)
   ) then
@@ -148,6 +150,7 @@ begin
   with candidates as (
     select
       listing.*,
+      car.listing_id as car_detail_listing_id,
       car.brand as car_brand,
       car.model as car_model,
       car.year as car_year,
@@ -155,10 +158,12 @@ begin
       car.fuel_type as car_fuel_type,
       car.transmission as car_transmission,
       car.condition as car_condition,
+      property.listing_id as property_detail_listing_id,
       property.property_type,
       property.bedrooms,
       property.bathrooms,
       property.size_sqm,
+      machinery.listing_id as machinery_detail_listing_id,
       machinery.machinery_type,
       machinery.brand as machinery_brand,
       machinery.model as machinery_model,
@@ -221,8 +226,11 @@ begin
     coalesce(listing.native_price, listing.price),
     coalesce(nullif(listing.native_currency, ''), nullif(listing.currency, ''), 'USD'),
     listing.variants,
-    case when jsonb_typeof(listing.photos) = 'array' and jsonb_array_length(listing.photos) > 0
-      then jsonb_build_array(listing.photos -> 0) else '[]'::jsonb end,
+    case
+      when jsonb_typeof(listing.photos) = 'array' and jsonb_array_length(listing.photos) > 0
+        then jsonb_build_array(listing.photos -> 0)
+      else '[]'::jsonb
+    end,
     listing.public_latitude,
     listing.public_longitude,
     listing.public_location_label,
@@ -231,19 +239,28 @@ begin
     listing.status::text,
     listing.views,
     listing.created_at,
-    case when listing.car_brand is null and listing.car_model is null then null else jsonb_build_object(
-      'brand', listing.car_brand, 'model', listing.car_model, 'year', listing.car_year,
-      'mileage', listing.car_mileage, 'fuel_type', listing.car_fuel_type,
-      'transmission', listing.car_transmission, 'condition', listing.car_condition
+    case when listing.car_detail_listing_id is null then null else jsonb_build_object(
+      'brand', listing.car_brand,
+      'model', listing.car_model,
+      'year', listing.car_year,
+      'mileage', listing.car_mileage,
+      'fuel_type', listing.car_fuel_type,
+      'transmission', listing.car_transmission,
+      'condition', listing.car_condition
     ) end,
-    case when listing.property_type is null then null else jsonb_build_object(
-      'property_type', listing.property_type, 'bedrooms', listing.bedrooms,
-      'bathrooms', listing.bathrooms, 'size_sqm', listing.size_sqm
+    case when listing.property_detail_listing_id is null then null else jsonb_build_object(
+      'property_type', listing.property_type,
+      'bedrooms', listing.bedrooms,
+      'bathrooms', listing.bathrooms,
+      'size_sqm', listing.size_sqm
     ) end,
-    case when listing.machinery_type is null then null else jsonb_build_object(
-      'machinery_type', listing.machinery_type, 'brand', listing.machinery_brand,
-      'model', listing.machinery_model, 'condition', listing.machinery_condition,
-      'year', listing.machinery_year, 'usage_hours', listing.usage_hours
+    case when listing.machinery_detail_listing_id is null then null else jsonb_build_object(
+      'machinery_type', listing.machinery_type,
+      'brand', listing.machinery_brand,
+      'model', listing.machinery_model,
+      'condition', listing.machinery_condition,
+      'year', listing.machinery_year,
+      'usage_hours', listing.usage_hours
     ) end,
     listing.has_current_peek,
     case p_sort
@@ -260,16 +277,25 @@ begin
     ))
     and (coalesce(p_category, '') = '' or listing.category = p_category)
     and (coalesce(p_location_id, '') = '' or listing.location_id::text = p_location_id)
-    and (normalized_query = ''
+    and (
+      normalized_query = ''
       or listing.search_document @@ websearch_to_tsquery('simple'::regconfig, normalized_query)
-      or listing.title ilike '%' || escaped_query || '%' escape E'\\')
+      or listing.title ilike '%' || escaped_query || '%' escape E'\\'
+    )
     and (not p_peek_only or listing.has_current_peek)
     and (
-      (p_kind = 'property' and listing.property_type is not null and (p_min_bedrooms is null or listing.bedrooms >= p_min_bedrooms))
-      or (p_kind = 'car' and (listing.car_brand is not null or listing.car_model is not null)
+      (p_kind = 'property'
+        and listing.property_detail_listing_id is not null
+        and (p_min_bedrooms is null or listing.bedrooms >= p_min_bedrooms))
+      or (p_kind = 'car'
+        and listing.car_detail_listing_id is not null
         and (coalesce(p_brand, '') = '' or listing.car_brand = p_brand)
         and (normalized_model = '' or listing.car_model ilike '%' || escaped_model || '%' escape E'\\')
-        and (normalized_seller_type = '' or (normalized_seller_type = 'dealer' and listing.is_dealer) or (normalized_seller_type = 'private' and not listing.is_dealer))
+        and (
+          normalized_seller_type = ''
+          or (normalized_seller_type = 'dealer' and listing.is_dealer)
+          or (normalized_seller_type = 'private' and not listing.is_dealer)
+        )
         and (coalesce(p_condition, '') = '' or listing.car_condition = p_condition)
         and (coalesce(p_fuel_type, '') = '' or listing.car_fuel_type::text = p_fuel_type)
         and (coalesce(p_transmission, '') = '' or listing.car_transmission::text = p_transmission)
@@ -279,7 +305,8 @@ begin
         and (p_min_year is null or listing.car_year >= p_min_year)
         and (p_max_year is null or listing.car_year <= p_max_year)
         and (p_max_mileage is null or listing.car_mileage <= p_max_mileage))
-      or (p_kind = 'machinery' and listing.machinery_type is not null
+      or (p_kind = 'machinery'
+        and listing.machinery_detail_listing_id is not null
         and (coalesce(p_brand, '') = '' or listing.machinery_brand = p_brand)
         and (coalesce(p_condition, '') = '' or listing.machinery_condition::text = p_condition))
     )
@@ -310,33 +337,93 @@ grant execute on function private.public_listing_search_card_page_v3(
 
 create or replace function public.public_listing_search_card_page_v3(
   p_kind text,
-  p_country_code text default 'ZW', p_currency text default '', p_query text default '',
-  p_category text default '', p_location_id text default '', p_min_price numeric default null,
-  p_max_price numeric default null, p_min_bedrooms integer default null, p_brand text default '',
-  p_model text default '', p_seller_type text default '', p_condition text default '',
-  p_fuel_type text default '', p_transmission text default '', p_body_type text default '',
-  p_drivetrain text default '', p_import_status text default '', p_min_year integer default null,
-  p_max_year integer default null, p_max_mileage integer default null, p_peek_only boolean default false,
-  p_sort text default 'newest', p_cursor_value text default null, p_cursor_id uuid default null,
+  p_country_code text default 'ZW',
+  p_currency text default '',
+  p_query text default '',
+  p_category text default '',
+  p_location_id text default '',
+  p_min_price numeric default null,
+  p_max_price numeric default null,
+  p_min_bedrooms integer default null,
+  p_brand text default '',
+  p_model text default '',
+  p_seller_type text default '',
+  p_condition text default '',
+  p_fuel_type text default '',
+  p_transmission text default '',
+  p_body_type text default '',
+  p_drivetrain text default '',
+  p_import_status text default '',
+  p_min_year integer default null,
+  p_max_year integer default null,
+  p_max_mileage integer default null,
+  p_peek_only boolean default false,
+  p_sort text default 'newest',
+  p_cursor_value text default null,
+  p_cursor_id uuid default null,
   p_limit integer default 24
 )
 returns table (
-  id uuid, kind text, seller_id uuid, seller_name text, seller_type text,
-  has_contact_phone boolean, has_contact_whatsapp boolean, has_contact_email boolean,
-  title text, price numeric, currency text, variants jsonb, photos jsonb, latitude numeric,
-  longitude numeric, public_location_label text, category text, listing_type text, status text,
-  views integer, created_at timestamptz, car_details jsonb, property_details jsonb,
-  machinery_details jsonb, has_current_peek boolean, cursor_value text
+  id uuid,
+  kind text,
+  seller_id uuid,
+  seller_name text,
+  seller_type text,
+  has_contact_phone boolean,
+  has_contact_whatsapp boolean,
+  has_contact_email boolean,
+  title text,
+  price numeric,
+  currency text,
+  variants jsonb,
+  photos jsonb,
+  latitude numeric,
+  longitude numeric,
+  public_location_label text,
+  category text,
+  listing_type text,
+  status text,
+  views integer,
+  created_at timestamptz,
+  car_details jsonb,
+  property_details jsonb,
+  machinery_details jsonb,
+  has_current_peek boolean,
+  cursor_value text
 )
 language sql
 stable
 security invoker
 set search_path = ''
 as $$
-  select * from private.public_listing_search_card_page_v3(
-    p_kind,p_country_code,p_currency,p_query,p_category,p_location_id,p_min_price,p_max_price,
-    p_min_bedrooms,p_brand,p_model,p_seller_type,p_condition,p_fuel_type,p_transmission,p_body_type,
-    p_drivetrain,p_import_status,p_min_year,p_max_year,p_max_mileage,p_peek_only,p_sort,p_cursor_value,p_cursor_id,p_limit
+  select *
+  from private.public_listing_search_card_page_v3(
+    p_kind,
+    p_country_code,
+    p_currency,
+    p_query,
+    p_category,
+    p_location_id,
+    p_min_price,
+    p_max_price,
+    p_min_bedrooms,
+    p_brand,
+    p_model,
+    p_seller_type,
+    p_condition,
+    p_fuel_type,
+    p_transmission,
+    p_body_type,
+    p_drivetrain,
+    p_import_status,
+    p_min_year,
+    p_max_year,
+    p_max_mileage,
+    p_peek_only,
+    p_sort,
+    p_cursor_value,
+    p_cursor_id,
+    p_limit
   );
 $$;
 
