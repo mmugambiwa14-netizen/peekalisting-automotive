@@ -18,24 +18,15 @@ import { getPublicTourFeedPage } from '@/services/listingToursService';
 import { listingTourQueryKeys } from '@/services/listingTourQueryKeys';
 import { PeekFeedSkeleton } from '@/components/loading/LoadingSkeletons';
 
-const AUTOPLAY_KEY = 'findit:peek:autoplay';
-const MUTE_KEY = 'findit:peek:mute-default';
-const VALID_CATEGORIES = new Set(['all', 'property', 'car', 'machinery', 'service']);
+const AUTOPLAY_KEY = 'peekalisting:automotive:peek:autoplay';
+const MUTE_KEY = 'peekalisting:automotive:peek:mute-default';
+const VEHICLE_PEEK_CATEGORY = 'car';
 const MAX_RESTORE_PAGES = 10;
-const CATEGORY_OPTIONS = [
-  ['all', 'All'],
-  ['property', 'Property'],
-  ['car', 'Cars'],
-  ['machinery', 'Machinery'],
-  ['service', 'Services'],
-];
 
 export default function Tours() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
-  const requestedCategory = params.get('category') || 'all';
   const requestedTourId = params.get('peek') || null;
-  const category = VALID_CATEGORIES.has(requestedCategory) ? requestedCategory : 'all';
   const [autoplay, setAutoplay] = useState(() => readStoredString('local', AUTOPLAY_KEY, 'on') !== 'off');
   const [muteByDefault, setMuteByDefault] = useState(() => readStoredString('local', MUTE_KEY, 'on') !== 'off');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -44,7 +35,7 @@ export default function Tours() {
   const feedRef = useRef(null);
   const restoredTourRef = useRef(null);
 
-  const filters = useMemo(() => ({ category, query: '', location: '', limit: 8 }), [category]);
+  const filters = useMemo(() => ({ category: VEHICLE_PEEK_CATEGORY, query: '', location: '', limit: 8 }), []);
   const feed = useInfiniteQuery({
     queryKey: listingTourQueryKeys.publicFeed(filters),
     queryFn: ({ pageParam }) => getPublicTourFeedPage({ ...filters, cursor: pageParam || null }),
@@ -64,12 +55,24 @@ export default function Tours() {
   const activeIndex = useMemo(() => items.findIndex((item) => item.tourId === activeTourId), [activeTourId, items]);
   const listingIds = useMemo(() => [...new Set(items.filter((item) => item.parentType === 'listing').map((item) => item.parentId))], [items]);
   const favourites = useQuery({
-    queryKey: ['tour-feed-favourites', user?.id || null, listingIds],
+    queryKey: ['vehicle-peek-feed-favourites', user?.id || null, listingIds],
     queryFn: () => getFavouriteIds(user.id, listingIds),
     enabled: Boolean(user && listingIds.length),
     staleTime: 30_000,
   });
   const savedSet = useMemo(() => new Set(favourites.data || []), [favourites.data]);
+
+  useEffect(() => {
+    // Automotive is the only public Peek feed at launch. Remove stale category
+    // parameters left by older shared-marketplace links without disturbing a
+    // requested vehicle Peek deep link.
+    if (!params.has('category')) return;
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('category');
+      return next;
+    }, { replace: true });
+  }, [params, setParams]);
 
   useEffect(() => {
     if (!activeTourId && !requestedTourId && items[0]?.tourId) setActiveTourId(items[0].tourId);
@@ -81,9 +84,7 @@ export default function Tours() {
 
     if (!targetExists) {
       const loadedPages = feed.data?.pages?.length || 0;
-      if (feed.hasNextPage && !feed.isFetchingNextPage && loadedPages < MAX_RESTORE_PAGES) {
-        feed.fetchNextPage();
-      }
+      if (feed.hasNextPage && !feed.isFetchingNextPage && loadedPages < MAX_RESTORE_PAGES) feed.fetchNextPage();
       return;
     }
 
@@ -97,8 +98,9 @@ export default function Tours() {
   useEffect(() => {
     if (!activeTourId) return;
     setParams((current) => {
-      if (current.get('peek') === activeTourId) return current;
+      if (current.get('peek') === activeTourId && !current.has('category')) return current;
       const next = new URLSearchParams(current);
+      next.delete('category');
       next.set('peek', activeTourId);
       return next;
     }, { replace: true });
@@ -144,60 +146,25 @@ export default function Tours() {
     writeStoredString('local', MUTE_KEY, enabled ? 'on' : 'off');
   };
 
-  const changeCategory = (nextCategory) => {
-    const next = new URLSearchParams(params);
-    if (nextCategory === 'all') next.delete('category'); else next.set('category', nextCategory);
-    next.delete('peek');
-    setParams(next, { replace: true });
-    restoredTourRef.current = null;
-    setActiveTourId(null);
-    feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
     <div className="fixed inset-0 z-40 bg-black text-white">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-50 px-[var(--findit-page-gutter)] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex items-center justify-between gap-3">
           <div className="pointer-events-auto flex min-w-0 items-center gap-1.5">
-            <BackButton
-              fallback="/"
-              label="Back to Discover"
-              className="h-10 w-10 rounded-full bg-black/45 text-white shadow-lg backdrop-blur-xl hover:bg-black/65"
-            />
-            <BrandLogo
-              className="min-w-0 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]"
-              markClassName="h-8 w-8"
-              wordmarkClassName="text-xl text-white"
-            />
+            <BackButton fallback="/" label="Back to Discover" className="h-10 w-10 rounded-full bg-black/45 text-white shadow-lg backdrop-blur-xl hover:bg-black/65" />
+            <div className="min-w-0">
+              <BrandLogo className="min-w-0 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]" markClassName="h-8 w-8" wordmarkClassName="text-xl text-white" />
+              <p className="ml-10 -mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60">Vehicle Peeks</p>
+            </div>
           </div>
           <div className="pointer-events-auto flex items-center gap-1 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
             <GlobalRefreshButton inline className="text-white/90 hover:bg-black/20 hover:text-white" />
-            {user && featureFlags.essentialNotifications && (
-              <NotificationBell className="text-white/90 hover:bg-black/20 hover:text-white" iconClassName="text-white" />
-            )}
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="flex h-[var(--findit-icon-button-size)] w-[var(--findit-icon-button-size)] items-center justify-center rounded-[var(--findit-control-radius)] text-white/90 hover:bg-black/20"
-              aria-label={`Peek settings. Autoplay is ${autoplay ? 'on' : 'off'}`}
-            >
+            {user && featureFlags.essentialNotifications && <NotificationBell className="text-white/90 hover:bg-black/20 hover:text-white" iconClassName="text-white" />}
+            <button type="button" onClick={() => setSettingsOpen(true)} className="flex h-[var(--findit-icon-button-size)] w-[var(--findit-icon-button-size)] items-center justify-center rounded-[var(--findit-control-radius)] text-white/90 hover:bg-black/20" aria-label={`Peek settings. Autoplay is ${autoplay ? 'on' : 'off'}`}>
               <Settings2 className="h-[var(--findit-icon-size)] w-[var(--findit-icon-size)]" />
             </button>
           </div>
         </div>
-
-        <nav className="pointer-events-auto mt-3 flex max-w-full gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Peek categories">
-          {CATEGORY_OPTIONS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => changeCategory(value)}
-              className={`h-[var(--findit-control-height-sm)] shrink-0 rounded-full px-3 text-xs font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)] ${category === value ? 'bg-white text-black' : 'text-white'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
       </div>
 
       {feed.isLoading ? (
@@ -206,17 +173,17 @@ export default function Tours() {
         <div className="flex h-full items-center justify-center px-5">
           <section className="max-w-sm rounded-3xl border border-white/10 bg-black/55 p-6 text-center backdrop-blur-xl">
             <WifiOff className="mx-auto h-7 w-7 text-blue-400" />
-            <h1 className="mt-3 text-lg font-bold">Peeks are temporarily offline</h1>
+            <h1 className="mt-3 text-lg font-bold">Vehicle Peeks are temporarily offline</h1>
             <p className="mt-2 text-sm text-white/65">Check your connection and try again.</p>
             <Button variant="secondary" className="mt-4" onClick={() => feed.refetch()}><RefreshCw />Try again</Button>
           </section>
         </div>
       ) : items.length === 0 ? (
         <div className="flex h-full items-center justify-center px-5 text-center">
-          <div><h1 className="text-xl font-bold">No Peeks here yet</h1><p className="mt-2 text-sm text-white/60">Try another category.</p></div>
+          <div><h1 className="text-xl font-bold">No vehicle Peeks yet</h1><p className="mt-2 max-w-xs text-sm text-white/60">Published vehicle Peeks will appear here as sellers add current visual evidence.</p></div>
         </div>
       ) : (
-        <main ref={feedRef} className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain" aria-label="Full-screen Peeks feed">
+        <main ref={feedRef} className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain" aria-label="Vehicle Peeks feed">
           {items.map((item, index) => (
             <ImmersivePeekSlide
               key={item.tourId}
@@ -237,22 +204,11 @@ export default function Tours() {
 
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <SheetContent side="bottom" className="mx-auto max-w-xl rounded-t-[1.75rem] border-white/10 bg-slate-950 text-white">
-          <SheetHeader className="text-left">
-            <SheetTitle className="text-white">Peeks settings</SheetTitle>
-            <SheetDescription>Control how videos behave while you browse.</SheetDescription>
-          </SheetHeader>
+          <SheetHeader className="text-left"><SheetTitle className="text-white">Peeks settings</SheetTitle><SheetDescription>Control how vehicle evidence videos behave while you browse.</SheetDescription></SheetHeader>
           <div className="mt-5 space-y-3">
-            <label className="flex items-center justify-between rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4">
-              <span><span className="block text-sm font-bold">Autoplay</span><span className="mt-1 block text-xs text-white/55">Play the visible Peek and continue when it ends.</span></span>
-              <Switch checked={autoplay} onCheckedChange={updateAutoplay} />
-            </label>
-            <label className="flex items-center justify-between rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4">
-              <span><span className="block text-sm font-bold">Muted by default</span><span className="mt-1 block text-xs text-white/55">Start each Peek without sound.</span></span>
-              <Switch checked={muteByDefault} onCheckedChange={updateMuteDefault} />
-            </label>
-            <div className="rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4 text-xs leading-5 text-white/60">
-              PeekaListing keeps only the current, previous, and next Peek ready. Other videos are released from memory, and playback pauses whenever the app goes into the background.
-            </div>
+            <label className="flex items-center justify-between rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4"><span><span className="block text-sm font-bold">Autoplay</span><span className="mt-1 block text-xs text-white/55">Play the visible Peek and continue when it ends.</span></span><Switch checked={autoplay} onCheckedChange={updateAutoplay} /></label>
+            <label className="flex items-center justify-between rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4"><span><span className="block text-sm font-bold">Muted by default</span><span className="mt-1 block text-xs text-white/55">Start each Peek without sound.</span></span><Switch checked={muteByDefault} onCheckedChange={updateMuteDefault} /></label>
+            <div className="rounded-[var(--findit-panel-radius)] border border-white/10 bg-white/5 p-4 text-xs leading-5 text-white/60">A Peek is visual evidence captured for a real listing. It is not a mechanical inspection or a guarantee of vehicle condition.</div>
           </div>
         </SheetContent>
       </Sheet>

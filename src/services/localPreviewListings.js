@@ -54,18 +54,18 @@ const PROPERTY_TEMPLATES = Object.freeze([
 ]);
 
 const CAR_TEMPLATES = Object.freeze([
-  { brand: 'Toyota', model: 'Hilux 2.8 GD-6 double cab', year: 2021, fuel: 'diesel', transmission: 'automatic', price: 28500, category: 'utility' },
-  { brand: 'Honda', model: 'Fit Hybrid', year: 2019, fuel: 'hybrid', transmission: 'automatic', price: 9800, category: 'cars_sale' },
-  { brand: 'Nissan', model: 'X-Trail 2.0', year: 2018, fuel: 'petrol', transmission: 'automatic', price: 16750, category: 'cars_sale' },
-  { brand: 'Mazda', model: 'CX-5 Skyactiv', year: 2020, fuel: 'petrol', transmission: 'automatic', price: 21800, category: 'cars_sale' },
-  { brand: 'Ford', model: 'Ranger Wildtrak', year: 2022, fuel: 'diesel', transmission: 'automatic', price: 42500, category: 'utility' },
-  { brand: 'Toyota', model: 'Fortuner 2.8', year: 2020, fuel: 'diesel', transmission: 'automatic', price: 39500, category: 'cars_sale' },
-  { brand: 'Mercedes-Benz', model: 'C200 Avantgarde', year: 2017, fuel: 'petrol', transmission: 'automatic', price: 23500, category: 'luxury_classic' },
-  { brand: 'Volkswagen', model: 'Polo TSI', year: 2021, fuel: 'petrol', transmission: 'automatic', price: 17200, category: 'cars_sale' },
-  { brand: 'Isuzu', model: 'D-Max 3.0', year: 2019, fuel: 'diesel', transmission: 'manual', price: 26750, category: 'utility' },
-  { brand: 'Subaru', model: 'Forester XT', year: 2018, fuel: 'petrol', transmission: 'automatic', price: 19400, category: 'cars_sale' },
-  { brand: 'Suzuki', model: 'Swift GLX', year: 2022, fuel: 'petrol', transmission: 'automatic', price: 14500, category: 'cars_sale' },
-  { brand: 'Toyota', model: 'Hiace commuter', year: 2017, fuel: 'diesel', transmission: 'manual', price: 24500, category: 'minibus_kombi' },
+  { brand: 'Toyota', model: 'Hilux 2.8 GD-6 double cab', year: 2021, fuel: 'diesel', transmission: 'automatic', price: 28500, category: 'utility', bodyType: 'bakkie', drivetrain: '4x4', importStatus: 'locally_registered' },
+  { brand: 'Honda', model: 'Fit Hybrid', year: 2019, fuel: 'hybrid', transmission: 'automatic', price: 9800, category: 'cars_sale', bodyType: 'hatchback', drivetrain: 'fwd', importStatus: 'imported_registered' },
+  { brand: 'Nissan', model: 'X-Trail 2.0', year: 2018, fuel: 'petrol', transmission: 'automatic', price: 16750, category: 'cars_sale', bodyType: 'suv', drivetrain: 'awd', importStatus: 'imported_registered' },
+  { brand: 'Mazda', model: 'CX-5 Skyactiv', year: 2020, fuel: 'petrol', transmission: 'automatic', price: 21800, category: 'cars_sale', bodyType: 'suv', drivetrain: 'awd', importStatus: 'locally_registered' },
+  { brand: 'Ford', model: 'Ranger Wildtrak', year: 2022, fuel: 'diesel', transmission: 'automatic', price: 42500, category: 'utility', bodyType: 'bakkie', drivetrain: '4x4', importStatus: 'locally_registered' },
+  { brand: 'Toyota', model: 'Fortuner 2.8', year: 2020, fuel: 'diesel', transmission: 'automatic', price: 39500, category: 'cars_sale', bodyType: 'suv', drivetrain: '4x4', importStatus: 'locally_registered' },
+  { brand: 'Mercedes-Benz', model: 'C200 Avantgarde', year: 2017, fuel: 'petrol', transmission: 'automatic', price: 23500, category: 'luxury_classic', bodyType: 'sedan', drivetrain: 'rwd', importStatus: 'imported_registered' },
+  { brand: 'Volkswagen', model: 'Polo TSI', year: 2021, fuel: 'petrol', transmission: 'automatic', price: 17200, category: 'cars_sale', bodyType: 'hatchback', drivetrain: 'fwd', importStatus: 'locally_registered' },
+  { brand: 'Isuzu', model: 'D-Max 3.0', year: 2019, fuel: 'diesel', transmission: 'manual', price: 26750, category: 'utility', bodyType: 'bakkie', drivetrain: '4x4', importStatus: 'locally_registered' },
+  { brand: 'Subaru', model: 'Forester XT', year: 2018, fuel: 'petrol', transmission: 'automatic', price: 19400, category: 'cars_sale', bodyType: 'suv', drivetrain: 'awd', importStatus: 'imported_registered' },
+  { brand: 'Suzuki', model: 'Swift GLX', year: 2022, fuel: 'petrol', transmission: 'automatic', price: 14500, category: 'cars_sale', bodyType: 'hatchback', drivetrain: 'fwd', importStatus: 'locally_registered' },
+  { brand: 'Toyota', model: 'Hiace commuter', year: 2017, fuel: 'diesel', transmission: 'manual', price: 24500, category: 'minibus_kombi', bodyType: 'minibus', drivetrain: 'rwd', importStatus: 'imported_registered' },
 ]);
 
 const MACHINERY_TEMPLATES = Object.freeze([
@@ -164,24 +164,38 @@ function createCar(index) {
   const sequence = Math.floor((index % 120) / CAR_TEMPLATES.length);
   const mileage = 28000 + ((index * 7913) % 185000);
   const condition = ['excellent', 'good', 'good', 'fair'][index % 4];
+  const year = template.year - (sequence % 3);
+  const colour = ['White', 'Silver', 'Black', 'Blue', 'Grey'][index % 5];
   return {
     ...commonFields(index, 'car', location),
-    title: `${template.year - (sequence % 3)} ${template.brand} ${template.model}`,
-    description: `Inspected preview vehicle with declared mileage, clear seller contact details and viewing available in ${location.name}. Service records can be requested before a test drive.`,
+    title: `${year} ${template.brand} ${template.model}`,
+    description: `Preview vehicle with declared mileage and condition, clear seller contact details, and viewing available in ${location.name}. Ask for a current Peek before arranging a trip.`,
     price: Math.round(template.price * (0.9 + (sequence % 6) * 0.025)),
     photos: [localAsset('findit-tour-thumbnail.webp')],
     category: template.category,
     listing_type: 'sale',
+    attributes: {
+      schema: 'car',
+      version: 2,
+      values: {
+        body_type: template.bodyType,
+        drivetrain: template.drivetrain,
+        import_status: template.importStatus,
+        exterior_colour: colour.toLowerCase(),
+        service_history: index % 3 !== 0 ? 'full' : 'partial',
+        service_records_available: index % 4 !== 0,
+        accident_history: index % 11 === 0 ? 'minor' : 'none',
+        registration_status: template.importStatus === 'imported_unregistered' ? 'unregistered' : 'registered',
+      },
+    },
     car_details: {
       brand: template.brand,
       model: template.model,
-      year: template.year - (sequence % 3),
+      year,
       mileage,
       fuel_type: template.fuel,
       transmission: template.transmission,
       condition,
-      color: ['White', 'Silver', 'Black', 'Blue', 'Grey'][index % 5],
-      full_service_history: index % 3 !== 0,
     },
     property_details: null,
     machinery_details: null,
@@ -240,12 +254,15 @@ export function findLocalPreviewListing(kind, id) {
 }
 
 export function filterLocalPreviewListings(request) {
-  const query = request.query.toLowerCase();
+  const query = String(request.query || '').toLowerCase();
+  const minimumPrice = request.minPrice ?? 0;
+  const maximumPrice = request.maxPrice ?? Number.MAX_SAFE_INTEGER;
   const rows = LISTINGS.filter((listing) => {
     const details = listing[`${listing.kind}_details`] || {};
+    const attributes = listing.attributes?.values || {};
     return listing.kind === request.kind
-      && listing.price >= request.minPrice
-      && listing.price <= request.maxPrice
+      && listing.price >= minimumPrice
+      && listing.price <= maximumPrice
       && (!query || `${listing.title} ${listing.description} ${listing.seller_name} ${listing.location.name}`.toLowerCase().includes(query))
       && (!request.category || listing.category === request.category)
       && (!request.locationId || listing.location.id === request.locationId)
@@ -253,7 +270,14 @@ export function filterLocalPreviewListings(request) {
       && (!request.brand || details.brand === request.brand)
       && (!request.condition || details.condition === request.condition)
       && (!request.fuelType || details.fuel_type === request.fuelType)
-      && (!request.transmission || details.transmission === request.transmission);
+      && (!request.transmission || details.transmission === request.transmission)
+      && (!request.bodyType || attributes.body_type === request.bodyType)
+      && (!request.drivetrain || attributes.drivetrain === request.drivetrain)
+      && (!request.importStatus || attributes.import_status === request.importStatus)
+      && (request.minYear == null || Number(details.year) >= request.minYear)
+      && (request.maxYear == null || Number(details.year) <= request.maxYear)
+      && (request.maxMileage == null || Number(details.mileage) <= request.maxMileage)
+      && (!request.peekOnly || localPreviewListingHasPeek(listing));
   });
   return [...rows].sort((left, right) => {
     if (request.sort === 'price_asc') return left.price - right.price || left.id.localeCompare(right.id);

@@ -16,6 +16,7 @@ export default function PublishSuccess({
   const tour = listing.tourDraft;
   const currency = getCurrencyConfig(listing.currency);
   const priceLabel = `${currency.symbol} ${Number(listing.price).toLocaleString()}`;
+  const awaitingReview = listing.status === 'pending_review' || !listing.status;
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center space-y-6 px-4 py-12 text-center">
@@ -24,9 +25,11 @@ export default function PublishSuccess({
       </div>
 
       <div>
-        <h1 className="text-2xl font-extrabold">Your listing is live</h1>
+        <h1 className="text-2xl font-extrabold">{awaitingReview ? 'Vehicle submitted for review' : 'Your vehicle listing is live'}</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          It passed the required technical checks and is now available to buyers. Reports are reviewed after publication.
+          {awaitingReview
+            ? 'PeekaListing will review the submission before it becomes publicly discoverable. You can manage it and prepare its Peek while review is pending.'
+            : 'The vehicle is now available to buyers. Future reports or material changes can still send it back through moderation.'}
         </p>
       </div>
 
@@ -34,7 +37,7 @@ export default function PublishSuccess({
         {listing.photos?.[0] && <img src={listing.photos[0]} alt="" loading="eager" decoding="async" className="mb-3 h-40 w-full rounded-xl object-cover" />}
         <p className="font-bold">{listing.title}</p>
         <p className="mt-1 font-extrabold text-primary">{priceLabel}</p>
-        <p className="mt-3 text-xs font-medium text-muted-foreground">Status: Live</p>
+        <p className="mt-3 text-xs font-medium text-muted-foreground">Status: {awaitingReview ? 'Pending review' : 'Live'}</p>
       </div>
 
       {tour?.status === 'uploaded' && (
@@ -44,7 +47,9 @@ export default function PublishSuccess({
             Peek uploaded
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            The listing is live while the Peek is processed. If processing fails, the listing remains available.
+            {awaitingReview
+              ? 'The Peek is being processed alongside the vehicle submission. It becomes public only through the existing Peek and listing moderation lifecycle.'
+              : 'The Peek is being processed. If processing fails, the vehicle listing remains available.'}
           </p>
         </div>
       )}
@@ -53,7 +58,7 @@ export default function PublishSuccess({
         <div className="w-full rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left" role="alert">
           <p className="flex items-center gap-2 text-sm font-semibold">
             <AlertTriangle className="h-4 w-4 text-destructive" />
-            The listing is live, but the Peek upload did not finish
+            {awaitingReview ? 'The vehicle was submitted, but the Peek upload did not finish' : 'The vehicle is live, but the Peek upload did not finish'}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{tour.error || 'The video upload was interrupted.'}</p>
           {tourProgress && <div className="mt-3"><TourUploadProgress progress={tourProgress} /></div>}
@@ -73,8 +78,8 @@ export default function PublishSuccess({
       )}
 
       <div className="grid w-full gap-2">
-        <Button asChild className="h-11 rounded-xl"><Link to="/my-listings">Manage my listings</Link></Button>
-        <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={onPostAnother}>Post another listing</Button>
+        <Button asChild className="h-11 rounded-xl"><Link to="/my-listings">Manage my vehicles</Link></Button>
+        <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={onPostAnother}>Sell another vehicle</Button>
       </div>
     </div>
   );

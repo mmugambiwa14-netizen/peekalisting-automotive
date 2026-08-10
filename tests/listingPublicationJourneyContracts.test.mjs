@@ -43,8 +43,6 @@ test('submission keeps the mature V1 transaction behind the schema-backed V2 bou
   assert.match(v2, /set attributes = p_attributes/);
   assert.match(v2, /if existing_listing_id is not null/);
 
-  // The V1 transaction still owns the hardened publication invariants rather
-  // than V2 duplicating them into a second implementation.
   assert.match(base, /active listing category not found/);
   assert.match(base, /active Zimbabwe location not found/);
   assert.match(base, /media_count not between 1 and 20/);
@@ -64,21 +62,20 @@ test('listing detail collection is generated from the shared versioned schema re
   assert.match(details, /field\.input === 'multiselect'/);
   assert.match(details, /field\.input === 'boolean'/);
   assert.match(contract, /normalizeSchemaDetail/);
-
-  // These camelCase V1 form keys were the old duplicate schema authority.
   assert.doesNotMatch(details, /propertyType|fuelType|machineryType|usageHours|needs_repair/);
   assert.doesNotMatch(contract, /PROPERTY_TYPES|FUEL_TYPES|TRANSMISSIONS|MACHINERY_TYPES|MACHINERY_CONDITIONS/);
 });
 
-test('validated listings publish immediately without listing moderation', async () => {
-  const migration = await read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql');
-  assert.match(migration, /auto_publish_validated_mvp_listing/);
-  assert.match(migration, /if new\.status = 'pending_review'/);
-  assert.match(migration, /new\.status := 'available'/);
-  assert.match(migration, /next_status := 'available'/);
-  assert.match(migration, /no human listing review/i);
-  assert.doesNotMatch(migration, /listing_approved/);
-  assert.doesNotMatch(migration, /admin_moderate_marketplace_item/);
+test('automotive launch preserves the inherited publisher while holding cars for moderation', async () => {
+  const inherited = await read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql');
+  const automotive = await read('supabase/migrations/20260810150000_automotive_open_vehicle_submission.sql');
+
+  assert.match(inherited, /auto_publish_validated_mvp_listing/);
+  assert.match(inherited, /new\.status := 'available'/);
+  assert.match(automotive, /new\.status = 'pending_review' and new\.kind::text <> 'car'/);
+  assert.match(automotive, /Vehicle submissions must enter review before publication/);
+  assert.match(automotive, /when listing_row\.kind::text = 'car' then 'pending_review'/);
+  assert.match(automotive, /private\.owner_transition_listing/);
 });
 
 test('public cards details search and seller inventory use available listing boundaries', async () => {
@@ -88,17 +85,18 @@ test('public cards details search and seller inventory use available listing bou
   assert.match(publicService, /hydrateListingImages/);
   assert.match(publicRepository, /PUBLIC_LISTING_SELECT/);
   assert.match(publicRepository, /\.in\('status', \['available', 'under_offer'\]\)/);
-  assert.match(publicRepository, /public_listing_search_page/);
+  assert.match(publicRepository, /public_listing_search_card_page_v2/);
   assert.match(app, /property\/\:id|property\/:id/);
   assert.match(app, /car\/\:id|car\/:id/);
   assert.match(app, /machinery\/\:id|machinery\/:id/);
 });
 
-test('owner journey supports edit pause resume relist unavailable and permanent delete', async () => {
+test('owner journey keeps lifecycle actions but automotive resubmission cannot self-approve', async () => {
   const page = await read('src/pages/MyListings.jsx');
   const creation = await read('src/services/listingCreationService.js');
   const owner = await read('src/services/ownerListingsService.js');
-  const migration = await read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql');
+  const inherited = await read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql');
+  const automotive = await read('supabase/migrations/20260810150000_automotive_open_vehicle_submission.sql');
   assert.match(page, /EditListingDialog/);
   assert.match(page, /action: 'pause'/);
   assert.match(page, /action: 'resume'/);
@@ -109,17 +107,18 @@ test('owner journey supports edit pause resume relist unavailable and permanent 
   assert.match(creation, /transitionOwnerListing/);
   assert.match(repository, /supabase\.rpc\('owner_transition_listing'/);
   assert.match(owner, /deleteOwnerListingRow/);
-  assert.match(migration, /p_action not in \('submit', 'pause', 'resume', 'unavailable'\)/);
-  assert.match(migration, /p_action = 'submit'/);
-  assert.match(migration, /next_status := 'available'/);
+  assert.match(inherited, /p_action not in \('submit', 'pause', 'resume', 'unavailable'\)/);
+  assert.match(automotive, /p_action = 'submit'/);
+  assert.match(automotive, /listing_row\.kind::text = 'car'/);
+  assert.match(automotive, /'pending_review'::public\.listing_status/);
 });
 
 test('valid live edits remain published while managed fields remain protected', async () => {
   const migration = await read('supabase/migrations/20260807030000_remove_listing_content_review_from_mvp.sql');
   const owner = await read('src/services/ownerListingsService.js');
   assert.match(migration, /protect_listing_managed_fields/);
+  assert.match(migration, /new\.status is distinct from old\.status/);
   assert.match(migration, /listing-managed fields require a trusted operation/);
-  assert.doesNotMatch(migration, /new\.status := 'pending_review'/);
   assert.match(owner, /replaceListingMedia/);
   assert.match(owner, /Promise\.allSettled\(removedPaths/);
   assert.match(owner, /partial: true/);
@@ -136,16 +135,20 @@ test('successful Peeks are automatically published after processing validation',
 test('listing journey has executable database and hosted certification assets', async () => {
   const pgTap = await read('supabase/tests/v1_listing_creation_and_media.sql');
   const v2PgTap = await read('supabase/tests/v1_listing_schema_v2_submission.sql');
+  const automotivePgTap = await read('supabase/tests/v1_curated_business_marketplace.sql');
   const runner = await read('scripts/certify-listing-publication-journey.mjs');
-  const rollback = await read('supabase/rollback/20260807030000_remove_listing_content_review_from_mvp.rollback.sql');
+  const rollback = await read('supabase/rollback/20260810150000_automotive_open_vehicle_submission.rollback.sql');
   const v2Rollback = await read('supabase/rollback/20260808081300_listing_schema_v2_submission.rollback.sql');
   assert.match(pgTap, /publish immediately without human review/);
   assert.match(pgTap, /pause a live listing/);
   assert.match(pgTap, /relist an unavailable listing/);
   assert.match(pgTap, /permanently delete/);
+  assert.match(automotivePgTap, /private vehicle remains pending until moderation approves publication/);
+  assert.match(automotivePgTap, /private seller cannot insert an already-public vehicle/);
   assert.match(v2PgTap, /exact richer fuel value/);
   assert.match(v2PgTap, /idempotent retry cannot mutate/);
   assert.match(runner, /listingPublicationJourneyContracts/);
-  assert.match(rollback, /Restore the pre-MVP owner transition contract/);
+  assert.match(rollback, /auto_publish_validated_mvp_listing/);
+  assert.match(rollback, /next_status := 'available'/);
   assert.match(v2Rollback, /Disable the V2 write surface/);
 });

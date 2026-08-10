@@ -17,7 +17,6 @@ import { PwaProvider } from '@/components/pwa/PwaProvider';
 import PwaStatusBar from '@/components/pwa/PwaStatusBar';
 import GlobalRefreshButton from '@/components/pwa/GlobalRefreshButton';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
-import BusinessPublishingGate from '@/components/business/BusinessPublishingGate';
 import { createLoginPath } from '@/lib/authNavigation';
 import { featureFlags } from '@/lib/featureFlags';
 import { queryClientInstance } from '@/lib/query-client';
@@ -36,6 +35,7 @@ const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Home = lazy(() => import('@/pages/Home'));
 const Search = lazy(() => import('@/pages/Search'));
+const Dealers = lazy(() => import('@/pages/Dealers'));
 const CreateListing = lazy(() => import('@/pages/CreateListing'));
 const CuratedCreateService = lazy(() => import('@/pages/CuratedCreateService'));
 const Saved = lazy(() => import('@/pages/Saved'));
@@ -134,18 +134,8 @@ const AuthenticatedApp = () => {
   const location = useLocation();
   const mfaGate = useMfaGate({ isAuthenticated, authChecked });
 
-  // OAuth callbacks must render before the normal auth/MFA gate. The callback
-  // may be the first page loaded in a browser window opened by an installed
-  // PWA, and it is responsible for handing the session back to that PWA.
   const isOAuthCallbackRoute = location.pathname.replace(/\/+$/, '').endsWith('/auth/callback');
-  if (isOAuthCallbackRoute) {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <OAuthCallback />
-      </Suspense>
-    );
-  }
-
+  if (isOAuthCallbackRoute) return <Suspense fallback={<LoadingScreen />}><OAuthCallback /></Suspense>;
   if (isLoadingPublicSettings || isLoadingAuth) return <LoadingScreen />;
   if (blockedAccount) return <AccountBlocked status={blockedAccount.status} reason={blockedAccount.reason} banUntil={blockedAccount.banUntil} />;
   if (authError) {
@@ -170,6 +160,7 @@ const AuthenticatedApp = () => {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/dealers" element={<Dealers />} />
           <Route path="/property/:id" element={<PropertyDetail />} />
           <Route path="/car/:id" element={<CarDetail />} />
           <Route path="/machinery/:id" element={<MachineryDetail />} />
@@ -192,7 +183,7 @@ const AuthenticatedApp = () => {
         </Route>
         <Route element={<ProtectedRoute unauthenticatedElement={<SignInRedirect />} />}>
           <Route element={<AppLayout />}>
-            <Route path="/post" element={<BusinessPublishingGate><CreateListing /></BusinessPublishingGate>} />
+            <Route path="/post" element={<CreateListing />} />
             <Route path="/create-service" element={<CuratedCreateService />} />
             <Route path="/my-services" element={<MyServices />} />
             <Route path="/saved" element={<Saved />} />

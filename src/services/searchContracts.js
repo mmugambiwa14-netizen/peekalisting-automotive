@@ -1,5 +1,6 @@
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 import { LAUNCH_COUNTRY_CODE } from '../lib/marketConfig.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SEARCH_KINDS = new Set(['property', 'car', 'machinery']);
 const SEARCH_SORTS = new Set(['newest', 'price_asc', 'price_desc', 'most_viewed']);
 const SEARCH_CURRENCIES = new Set(['USD', 'ZWL', 'ZAR']);
@@ -14,6 +15,12 @@ function positiveInteger(value, fallback = null) {
   return Number.isInteger(number) && number > 0 ? number : fallback;
 }
 
+function boundedInteger(value, minimum, maximum) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= minimum && number <= maximum ? number : null;
+}
+
 function optionalNonNegativeNumber(value) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
@@ -21,10 +28,7 @@ function optionalNonNegativeNumber(value) {
 }
 
 function baseRequest(input = {}) {
-  const kind = SEARCH_KINDS.has(input.kind) ? input.kind : 'property';
-  // The public launch surface is Zimbabwe-only. Country records remain in the
-  // database for future markets, but URL/query tampering cannot switch this
-  // public search to another country.
+  const kind = SEARCH_KINDS.has(input.kind) ? input.kind : 'car';
   const countryCode = LAUNCH_COUNTRY_CODE;
   const requestedCurrency = text(input.currency, 3).toUpperCase();
   const currency = SEARCH_CURRENCIES.has(requestedCurrency) ? requestedCurrency : '';
@@ -32,9 +36,10 @@ function baseRequest(input = {}) {
   let maxPrice = currency ? optionalNonNegativeNumber(input.maxPrice) : null;
   if (minPrice !== null && maxPrice !== null && maxPrice < minPrice) maxPrice = minPrice;
   const requestedSort = SEARCH_SORTS.has(input.sort) ? input.sort : 'newest';
-  const sort = !currency && (requestedSort === 'price_asc' || requestedSort === 'price_desc')
-    ? 'newest'
-    : requestedSort;
+  const sort = !currency && (requestedSort === 'price_asc' || requestedSort === 'price_desc') ? 'newest' : requestedSort;
+  const minYear = boundedInteger(input.minYear, 1886, 2100);
+  let maxYear = boundedInteger(input.maxYear, 1886, 2100);
+  if (minYear !== null && maxYear !== null && maxYear < minYear) maxYear = minYear;
 
   return {
     kind,
@@ -50,6 +55,13 @@ function baseRequest(input = {}) {
     condition: text(input.condition, 40),
     fuelType: text(input.fuelType, 40),
     transmission: text(input.transmission, 40),
+    bodyType: text(input.bodyType, 40),
+    drivetrain: text(input.drivetrain, 40),
+    importStatus: text(input.importStatus, 40),
+    minYear,
+    maxYear,
+    maxMileage: boundedInteger(input.maxMileage, 0, 3_000_000),
+    peekOnly: input.peekOnly === true || input.peekOnly === 'true' || input.peekOnly === '1',
     sort,
     pageSize: PAGE_SIZE,
   };
@@ -73,20 +85,11 @@ export function normalizePublicSearchCursor(value, sort) {
   return { id, value: String(number) };
 }
 
-// Compatibility contract for inactive offset consumers and older tests. The
-// active Search page uses normalizePublicSearchPageRequest below.
 export function normalizePublicSearchRequest(input = {}) {
-  return {
-    ...baseRequest(input),
-    page: positiveInteger(input.page, 1),
-    cursor: null,
-  };
+  return { ...baseRequest(input), page: positiveInteger(input.page, 1), cursor: null };
 }
 
 export function normalizePublicSearchPageRequest(input = {}) {
   const request = baseRequest(input);
-  return {
-    ...request,
-    cursor: normalizePublicSearchCursor(input.cursor, request.sort),
-  };
+  return { ...request, cursor: normalizePublicSearchCursor(input.cursor, request.sort) };
 }

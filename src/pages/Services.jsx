@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { List, Loader2, Map as MapIcon, Plus, Search, X } from 'lucide-react';
 import CategoryResultsHeader from '@/components/search/CategoryResultsHeader';
@@ -12,10 +12,11 @@ import { getPublicServicesPage } from '@/services/servicesService';
 import { MapPanelSkeleton } from '@/components/loading/LoadingSkeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic';
+
 export default function Services() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const category = searchParams.get('category') || 'all';
+  const specialization = searchParams.get('specialization') || '';
   const query = searchParams.get('q') || '';
   const locationId = searchParams.get('location') || '';
   const locationName = searchParams.get('locationName') || '';
@@ -28,16 +29,22 @@ export default function Services() {
     if (value === query) return undefined;
     const timeout = window.setTimeout(() => {
       const next = new URLSearchParams(searchParams);
-      if (value) next.set('q', value);
-      else next.delete('q');
+      if (value) next.set('q', value); else next.delete('q');
       setSearchParams(next, { replace: true });
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [query, searchInput, searchParams, setSearchParams]);
 
   const servicesQuery = useInfiniteQuery({
-    queryKey: ['services', category, query, locationId],
-    queryFn: ({ pageParam }) => getPublicServicesPage({ category, query, locationId, limit: 24, cursor: pageParam || null }),
+    queryKey: ['automotive-services', specialization, query, locationId],
+    queryFn: ({ pageParam }) => getPublicServicesPage({
+      category: AUTOMOTIVE_SERVICE_DOMAIN,
+      specialization,
+      query,
+      locationId,
+      limit: 24,
+      cursor: pageParam || null,
+    }),
     initialPageParam: null,
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
     staleTime: 30_000,
@@ -45,18 +52,15 @@ export default function Services() {
 
   const services = useMemo(() => {
     const byId = new Map();
-    for (const page of servicesQuery.data?.pages || []) {
-      for (const service of page.items) byId.set(service.id, service);
-    }
+    for (const page of servicesQuery.data?.pages || []) for (const service of page.items) byId.set(service.id, service);
     return [...byId.values()];
   }, [servicesQuery.data]);
 
   const { isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = servicesQuery;
 
-  const selectCategory = (value) => {
+  const selectSpecialization = (value) => {
     const next = new URLSearchParams(searchParams);
-    if (!value) next.delete('category');
-    else next.set('category', value);
+    if (!value) next.delete('specialization'); else next.set('specialization', value);
     setSearchParams(next);
   };
 
@@ -66,21 +70,9 @@ export default function Services() {
     setSearchParams(next);
   };
 
-  const changeType = (nextType) => {
-    if (nextType === 'service') return;
-    const params = new URLSearchParams();
-    params.set('type', nextType);
-    for (const key of ['q', 'location', 'locationName', 'country', 'province']) {
-      const value = searchParams.get(key);
-      if (value) params.set(key, value);
-    }
-    navigate(`/search?${params.toString()}`);
-  };
-
   const setView = (view) => {
     const next = new URLSearchParams(searchParams);
-    if (view === 'map') next.set('view', 'map');
-    else next.delete('view');
+    if (view === 'map') next.set('view', 'map'); else next.delete('view');
     setSearchParams(next, { replace: true });
   };
 
@@ -88,49 +80,20 @@ export default function Services() {
     <div className="min-h-[100dvh] bg-background md:pb-8">
       <header className="glass-bar sticky top-0 z-40 border-b">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <CategoryResultsHeader
-            type="service"
-            category={category === 'all' ? '' : category}
-            onTypeChange={changeType}
-            onCategorySelect={selectCategory}
-          />
+          <CategoryResultsHeader type="service" category={specialization} onCategorySelect={selectSpecialization} />
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Find services around the full vehicle journey—from pre-purchase inspection and diagnostics to tyres, bodywork, towing, transport and ongoing maintenance.</p>
 
           <div className="mt-4 flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search services, providers or areas"
-                aria-label="Search services"
-                className="h-12 rounded-2xl pl-12 pr-12"
-              />
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={() => setSearchInput('')}
-                  aria-label="Clear search"
-                  className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+              <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search automotive services or providers" aria-label="Search automotive services" className="h-12 rounded-2xl pl-12 pr-12" />
+              {searchInput && <button type="button" onClick={() => setSearchInput('')} aria-label="Clear search" className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
             </div>
-            <Button asChild className="hidden h-12 shrink-0 rounded-xl sm:inline-flex">
-              <Link to="/create-service"><Plus className="mr-2 h-4 w-4" />Offer service</Link>
-            </Button>
+            <Button asChild className="hidden h-12 shrink-0 rounded-xl sm:inline-flex"><Link to="/create-service"><Plus className="mr-2 h-4 w-4" />Offer a service</Link></Button>
           </div>
           {locationId && (
             <div className="mt-3 flex items-center">
-              <button
-                type="button"
-                onClick={clearLocation}
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/15"
-                aria-label={`Remove location filter${locationName ? ` for ${locationName}` : ''}`}
-              >
-                Near {locationName || 'selected location'}
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
+              <button type="button" onClick={clearLocation} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/15" aria-label={`Remove location filter${locationName ? ` for ${locationName}` : ''}`}>Near {locationName || 'selected location'}<X className="h-3.5 w-3.5" aria-hidden="true" /></button>
             </div>
           )}
         </div>
@@ -138,10 +101,7 @@ export default function Services() {
 
       <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Results</h2>
-            {isLoading ? <Skeleton className="mt-1 h-4 w-32" /> : <p className="text-sm text-muted-foreground">Showing {services.length} service{services.length === 1 ? '' : 's'}</p>}
-          </div>
+          <div><h2 className="text-lg font-semibold">Available providers</h2>{isLoading ? <Skeleton className="mt-1 h-4 w-32" /> : <p className="text-sm text-muted-foreground">Showing {services.length} service{services.length === 1 ? '' : 's'}</p>}</div>
           <div className="flex items-center gap-2">
             {featureFlags.maps && (
               <div className="flex items-center rounded-xl border border-border bg-card p-1" role="group" aria-label="Service result view">
@@ -149,30 +109,16 @@ export default function Services() {
                 <button type="button" onClick={() => setView('map')} aria-pressed={showMap} className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${showMap ? 'bg-primary/12 text-primary' : 'text-muted-foreground'}`}><MapIcon className="h-4 w-4" />Map</button>
               </div>
             )}
-            <Button asChild variant="outline" className="sm:hidden">
-              <Link to="/create-service"><Plus className="mr-1.5 h-4 w-4" />Offer service</Link>
-            </Button>
+            <Button asChild variant="outline" className="sm:hidden"><Link to="/create-service"><Plus className="mr-1.5 h-4 w-4" />Offer service</Link></Button>
           </div>
         </div>
 
         {error ? (
-          <div className="surface-panel px-4 py-12 text-center">
-            <p className="font-semibold">We could not load services</p>
-            <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
-            <Button type="button" variant="outline" className="mt-4" onClick={() => refetch()}>Try again</Button>
-          </div>
+          <div className="surface-panel px-4 py-12 text-center"><p className="font-semibold">We could not load automotive services</p><p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p><Button type="button" variant="outline" className="mt-4" onClick={() => refetch()}>Try again</Button></div>
         ) : (
           <>
-            {showMap ? (
-              isLoading ? <MapPanelSkeleton label="Loading service map" /> : <SearchResultsMap listings={services.map((service) => ({ ...service, _type: 'service', city: service.location_name }))} type="service" />
-            ) : <ServiceGrid services={services} isLoading={isLoading} />}
-            {hasNextPage && (
-              <div className="mt-6 flex justify-center">
-                <Button type="button" variant="outline" className="min-w-48" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
-                  {isFetchingNextPage ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Loading</> : 'Load more services'}
-                </Button>
-              </div>
-            )}
+            {showMap ? (isLoading ? <MapPanelSkeleton label="Loading automotive service map" /> : <SearchResultsMap listings={services.map((service) => ({ ...service, _type: 'service', city: service.location_name }))} type="service" />) : <ServiceGrid services={services} isLoading={isLoading} />}
+            {hasNextPage && <div className="mt-6 flex justify-center"><Button type="button" variant="outline" className="min-w-48" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>{isFetchingNextPage ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Loading</> : 'Load more services'}</Button></div>}
             {!hasNextPage && services.length > 0 && <p className="mt-6 text-center text-xs text-muted-foreground">You have reached the end of these results.</p>}
           </>
         )}
