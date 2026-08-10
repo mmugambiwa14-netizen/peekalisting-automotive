@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/AuthContext';
 import {
   getMyPublishingAccess,
+  requestAdditionalBusinessCategories,
   respondToBusinessApplication,
   submitBusinessApplication,
 } from '@/services/businessPublishingService';
@@ -80,7 +81,6 @@ export default function DealerOnboarding() {
   const carsPending = Boolean(access?.pendingCategories?.includes('car'));
   const carsSuspended = Boolean(access?.suspendedCategories?.includes('car'));
   const needsInformation = access?.applicationStatus === 'needs_information' || access?.needsInformation;
-  const hasApplication = Boolean(access?.applicationId && access?.applicationStatus !== 'not_started');
   const dealerProfileReady = profile?.business_type === 'car_dealership';
 
   const refresh = async () => {
@@ -132,6 +132,15 @@ export default function DealerOnboarding() {
     onError: (error) => toast.error(error.message || 'Dealer application could not be submitted.'),
   });
 
+  const categoryMutation = useMutation({
+    mutationFn: () => requestAdditionalBusinessCategories(['car']),
+    onSuccess: async () => {
+      toast.success('Cars approval requested');
+      await refresh();
+    },
+    onError: (error) => toast.error(error.message || 'Cars approval could not be requested.'),
+  });
+
   const responseMutation = useMutation({
     mutationFn: () => respondToBusinessApplication(access.applicationId, response),
     onSuccess: async () => {
@@ -155,9 +164,13 @@ export default function DealerOnboarding() {
     if (carsSuspended) return 'suspended';
     if (carsApproved) return 'approved';
     if (needsInformation) return 'needs_information';
-    if (carsPending || ['submitted', 'reviewing'].includes(access?.applicationStatus)) return 'pending';
+    if (carsPending) return 'pending';
+    if (['submitted', 'reviewing'].includes(access?.applicationStatus)) return 'existing_application_pending';
+    if (access?.applicationStatus === 'approved') return 'request_category';
     return 'not_started';
   }, [access?.applicationStatus, carsApproved, carsPending, carsSuspended, needsInformation]);
+
+  const dealerProfileStageOpen = carsApproved || carsPending || carsSuspended;
 
   if (accessQuery.isLoading || profileQuery.isLoading) {
     return <main className="relative mx-auto min-h-[70vh] max-w-3xl px-4 pb-10 pt-20"><BackButton className="absolute left-4 top-4" fallback="/dealers" label="Back to Dealers" /><FormSkeleton fields={6} label="Loading dealer onboarding" /></main>;
@@ -178,6 +191,7 @@ export default function DealerOnboarding() {
 
       <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-8">
         {accessQuery.isError && <StatusCard icon={ShieldAlert} title="We could not load your dealer application" tone="danger"><p>Check your connection and try again.</p><Button type="button" variant="outline" className="mt-3" onClick={() => accessQuery.refetch()}>Try again</Button></StatusCard>}
+        {profileQuery.isError && <StatusCard icon={ShieldAlert} title="We could not load your business profile" tone="danger"><p>Your dealer-approval state is still safe. Retry before editing or creating the public dealership profile.</p><Button type="button" variant="outline" className="mt-3" onClick={() => profileQuery.refetch()}>Retry profile</Button></StatusCard>}
 
         {applicationStatus === 'approved' && (
           <StatusCard icon={CheckCircle2} title="Cars business approval is active" tone="success">
@@ -187,7 +201,18 @@ export default function DealerOnboarding() {
         )}
 
         {applicationStatus === 'pending' && (
-          <StatusCard icon={Clock3} title="Dealer application is under review" tone="warning"><p>You can prepare your public dealer profile while the Cars business application is reviewed. Approval controls dealer-directory eligibility; it does not change your normal ability to submit a private vehicle for review.</p></StatusCard>
+          <StatusCard icon={Clock3} title="Cars approval is under review" tone="warning"><p>You can prepare your public dealer profile while the Cars category is reviewed. Approval controls dealer-directory eligibility; it does not change your normal ability to submit a private vehicle for review.</p></StatusCard>
+        )}
+
+        {applicationStatus === 'existing_application_pending' && (
+          <StatusCard icon={Clock3} title="Your existing business application is still under review" tone="warning"><p>PeekaListing allows one active business application at a time. When that application is approved, return here and request Cars as an additional business category instead of creating a second application.</p></StatusCard>
+        )}
+
+        {applicationStatus === 'request_category' && (
+          <StatusCard icon={Store} title="Add Cars to your approved business" tone="default">
+            <p>You already have an approved PeekaListing business application. Request Cars as an additional category to begin dealership review; a second business application is neither needed nor allowed.</p>
+            <Button type="button" className="mt-3" disabled={categoryMutation.isPending} onClick={() => categoryMutation.mutate()}>{categoryMutation.isPending ? 'Requesting…' : 'Request Cars approval'}</Button>
+          </StatusCard>
         )}
 
         {applicationStatus === 'suspended' && (
@@ -199,7 +224,7 @@ export default function DealerOnboarding() {
             <p className="findit-overline">More information required</p>
             <h2 className="mt-2 text-xl font-extrabold">Respond to the reviewer</h2>
             {access?.reviewerMessage && <p className="mt-2 rounded-xl bg-amber-500/8 p-3 text-sm text-muted-foreground">{access.reviewerMessage}</p>}
-            <Textarea className="mt-4" rows={5} minLength={5} maxLength={3000} value={response} onChange={(event) => setResponse(event.target.value)} placeholder="Provide the requested dealership information" />
+            <Textarea className="mt-4" rows={5} minLength={5} maxLength={3000} value={response} onChange={(event) => setResponse(event.target.value)} placeholder="Provide the requested business information" />
             <Button type="button" className="mt-3" disabled={responseMutation.isPending || response.trim().length < 5} onClick={() => responseMutation.mutate()}>{responseMutation.isPending ? 'Sending…' : 'Send information'}</Button>
           </section>
         )}
@@ -223,9 +248,9 @@ export default function DealerOnboarding() {
           </section>
         )}
 
-        {hasApplication && applicationStatus !== 'not_started' && (
+        {dealerProfileStageOpen && !profileQuery.isError && (
           <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-            <div className="flex items-start gap-3"><span className="locked-icon-tile h-11 w-11 shrink-0"><Building2 className="h-5 w-5" /></span><div><p className="findit-overline">Step 2</p><h2 className="mt-1 text-xl font-extrabold">{profile ? 'Dealer profile' : 'Create your dealer profile'}</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">This is the public identity buyers see. It does not become directory-eligible until Cars business approval is active.</p></div></div>
+            <div className="flex items-start gap-3"><span className="locked-icon-tile h-11 w-11 shrink-0"><Building2 className="h-5 w-5" /></span><div><p className="findit-overline">Dealer profile</p><h2 className="mt-1 text-xl font-extrabold">{profile ? 'Manage your dealership profile' : 'Create your dealership profile'}</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">This is the public identity buyers see. It becomes eligible for the Dealers directory only while Cars business approval is active.</p></div></div>
             <div className="mt-6">
               <BusinessProfileForm
                 key={`${profile?.updated_at || 'new'}-${applicationStatus}`}
