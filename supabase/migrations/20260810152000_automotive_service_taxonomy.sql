@@ -6,7 +6,8 @@ begin;
 update public.categories
 set display_label = 'Automotive Services',
     description = 'Vehicle inspection, repair, maintenance, bodywork, recovery, transport and ownership-support services.',
-    aliases = array(select distinct value from unnest(coalesce(aliases, '{}'::text[]) || array['automotive','vehicle services','car services']) value),
+    aliases = array(select distinct value from unnest(coalesce(aliases, '{}'::text[]) || array['automotive','vehicle_services','car_services']) value),
+    synonyms = array(select distinct value from unnest(coalesce(synonyms, '{}'::text[]) || array['automotive services','vehicle services','car services']) value),
     taxonomy_version = taxonomy_version + 1
 where marketplace_kind = 'service'
   and slug = 'mechanic';
@@ -73,6 +74,7 @@ on conflict (marketplace_kind, slug) do update set
   sort_order = excluded.sort_order,
   node_type = 'category',
   is_postable = true,
+  is_active = true,
   synonyms = excluded.synonyms,
   schema_binding = excluded.schema_binding,
   valid_to = null,
