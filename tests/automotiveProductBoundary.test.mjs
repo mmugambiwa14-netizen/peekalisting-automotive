@@ -7,9 +7,10 @@ async function source(path) {
 }
 
 test('public shell is automotive-first without deleting reusable dormant routes', async () => {
-  const [home, nav, app] = await Promise.all([
+  const [home, nav, topNav, app] = await Promise.all([
     source('src/pages/Home.jsx'),
     source('src/lib/navigationConfig.js'),
+    source('src/components/layout/TopNav.jsx'),
     source('src/App.jsx'),
   ]);
 
@@ -21,6 +22,9 @@ test('public shell is automotive-first without deleting reusable dormant routes'
   assert.doesNotMatch(home, /DiscoverCategoryGrid/);
   assert.match(nav, /label: 'Sell'/);
   assert.doesNotMatch(nav, /label: 'Post'/);
+  for (const label of ["'Cars'", "'Dealers'", "'Services'", "'Peeks'", "'Chats'"]) assert.match(topNav, new RegExp(`label: ${label}`));
+  assert.match(topNav, /<span>Sell<\/span>/);
+  assert.doesNotMatch(topNav, /<span>Post<\/span>/);
   assert.ok(app.includes('path="/post" element={<CreateListing />}'));
   assert.ok(app.includes('path="/dealers" element={<Dealers />}'));
   assert.doesNotMatch(app, /BusinessPublishingGate><CreateListing/);
@@ -36,6 +40,7 @@ test('launch taxonomy is narrower than the reusable vehicle ontology', async () 
   assert.match(config, /new Set\(\['car', 'bakkie', 'van'\]\)/);
   assert.match(config, /defaults\.offer_type.*AUTOMOTIVE_LAUNCH_OFFER/);
   assert.match(config, /defaults\.parts_family/);
+  assert.match(config, /Array\.isArray\(defaults\.segments\)/);
   assert.match(step, /getCategoryTaxonomy\('car'/);
   assert.match(step, /launchVehicleCategoryOptions/);
   assert.match(step, /Submission is open; publication is controlled/);
@@ -58,17 +63,19 @@ test('private vehicle submission remains moderated and other domains remain cura
 });
 
 test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
-  const [search, filters, repository, migration] = await Promise.all([
+  const [search, filters, repository, migration, preview] = await Promise.all([
     source('src/pages/Search.jsx'),
     source('src/components/search/VehicleFilters.jsx'),
     source('src/repositories/publicListingsRepository.js'),
     source('supabase/migrations/20260810151000_automotive_search_projection.sql'),
+    source('src/services/localPreviewListings.js'),
   ]);
 
   assert.match(search, /const TYPE = 'car'/);
   for (const field of ['bodyType', 'drivetrain', 'importStatus', 'minYear', 'maxYear', 'maxMileage', 'peekOnly']) {
     assert.match(search, new RegExp(field));
     assert.match(filters, new RegExp(field));
+    assert.match(preview, new RegExp(field));
   }
   assert.match(repository, /public_listing_search_card_page_v2/);
   assert.match(migration, /attributes -> 'values' ->> 'body_type'/);
@@ -77,6 +84,8 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(migration, /listing_tour_slots/);
   assert.match(migration, /p_max_mileage/);
   assert.match(migration, /kind = 'car'::public\.listing_kind/);
+  assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
+  assert.match(migration, /car\.transmission::text = p_transmission/);
   const privateReturnStart = migration.indexOf('returns table (');
   const privateReturnEnd = migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
@@ -101,21 +110,27 @@ test('automotive Peek surfaces ask for observable evidence instead of becoming a
   assert.match(detail, /Seller-declared/);
 });
 
-test('dealers and automotive services reuse existing business and service systems', async () => {
-  const [dealersRepository, dealersPage, servicesPage, servicesRepository, serviceTaxonomy] = await Promise.all([
+test('dealers and automotive services reuse existing systems with current approval boundaries', async () => {
+  const [dealersRepository, dealersPage, dealerMigration, servicesPage, servicesRepository, serviceTaxonomy, serviceRollback] = await Promise.all([
     source('src/repositories/dealersRepository.js'),
     source('src/pages/Dealers.jsx'),
+    source('supabase/migrations/20260810153000_automotive_dealer_directory.sql'),
     source('src/pages/Services.jsx'),
     source('src/repositories/servicesRepository.js'),
     source('supabase/migrations/20260810152000_automotive_service_taxonomy.sql'),
+    source('supabase/rollback/20260810152000_automotive_service_taxonomy.rollback.sql'),
   ]);
 
-  assert.match(dealersRepository, /business_profiles_public/);
-  assert.match(dealersRepository, /profile_type', 'dealer'/);
+  assert.match(dealersRepository, /public_automotive_dealers_page/);
+  assert.match(dealerMigration, /approval\.category = 'car'/);
+  assert.match(dealerMigration, /approval\.status = 'approved'/);
   assert.match(dealersPage, /View dealer inventory/);
   assert.match(servicesPage, /const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic'/);
   assert.match(servicesRepository, /contains\('subcategories', \[request\.specialization\]\)/);
   for (const specialization of ['pre_purchase_inspection', 'vehicle_diagnostics', 'tyres_wheels', 'panel_beating', 'vehicle_towing', 'vehicle_transport']) {
     assert.match(serviceTaxonomy, new RegExp(specialization));
   }
+  assert.match(serviceTaxonomy, /is_active = true/);
+  assert.doesNotMatch(serviceRollback, /delete from public\.categories/);
+  assert.match(serviceRollback, /is_active = false/);
 });
