@@ -5,7 +5,7 @@ export const TRUSTED_NON_PRODUCTION_DEPLOYMENTS = Object.freeze([
 
 const trustedNonProductionDeployments = new Set(TRUSTED_NON_PRODUCTION_DEPLOYMENTS);
 const TRUSTED_STAGING_HOSTS = new Set([
-  'staging.peekalisting.com',
+  'cars-staging.peekalisting.com',
 ]);
 
 export function isTrustedStagingDeployment(env = {}) {
