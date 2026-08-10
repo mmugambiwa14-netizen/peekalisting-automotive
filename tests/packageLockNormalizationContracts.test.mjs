@@ -8,7 +8,7 @@ function lineIndex(source, pattern) {
   return source.split('\n').findIndex((line) => pattern.test(line));
 }
 
-test('every locked workflow install normalizes the package lock first', async () => {
+test('every active locked workflow install normalizes the package lock first', async () => {
   const fileNames = (await readdir(workflowsDirectory)).filter((name) => /\.ya?ml$/i.test(name));
   let installPaths = 0;
 
@@ -27,9 +27,8 @@ test('every locked workflow install normalizes the package lock first', async ()
     assert.ok(setupNode < lockedInstall, `${fileName}: setup Node before npm ci`);
   }
 
-  // Pinned deliberately so npm-ci detection cannot pass vacuously. The unified
-  // certification workflow adds the fourteenth currently locked install path.
-  assert.equal(installPaths, 14, 'all fourteen npm-ci workflow paths must be covered');
+  assert.ok(fileNames.includes('automotive-ci.yml'), 'the automotive CI workflow must remain active');
+  assert.equal(installPaths, 1, 'only the automotive CI locked install is active in this isolated repository');
 });
 
 test('normalizer synchronizes the manifest boundary and removes retired packages', async () => {
