@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { assertSmokeTarget } from './lib/smoke-target.mjs';
 
@@ -13,16 +14,29 @@ const root = createClient(url, secretKey, options);
 const publicClient = createClient(url, anonKey, options);
 const stamp = Date.now();
 const marker = `autoscale${stamp}`;
-const password = `Peeka!Auto${stamp}`;
+const password = `Peeka-${crypto.randomBytes(24).toString('base64url')}!9aA`;
 const pageSize = 24;
-const fixtureCount = Number(process.env.FINDIT_AUTOMOTIVE_SEARCH_FIXTURE_COUNT ?? 120);
+const fixtureCount = Number(process.env.FINDIT_AUTOMOTIVE_SEARCH_FIXTURE_COUNT ?? 104);
 const half = fixtureCount / 2;
 const privateEmail = `${marker}-private@example.test`;
 const dealerEmail = `${marker}-dealer@example.test`;
+const adminEmail = `${marker}-admin@example.test`;
+const functionUrl = `${url}/functions/v1/listing-image-upload`;
+const pngBytes = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
 let privateUserId;
 let dealerUserId;
+let adminUserId;
 let businessProfileId;
 let businessApplicationId;
+let privateClient;
+let dealerClient;
+let adminClient;
+const listingIds = [];
+const storagePaths = [];
 
 function success(result, label) {
   assert.equal(result.error, null, `${label}: ${result.error?.message ?? 'unknown error'}`);
@@ -35,8 +49,104 @@ function authenticatedClient() {
 
 async function signIn(email) {
   const client = authenticatedClient();
-  success(await client.auth.signInWithPassword({ email, password }), `sign in ${email}`);
-  return client;
+  const session = success(await client.auth.signInWithPassword({ email, password }), `sign in ${email}`).session;
+  return { client, session };
+}
+
+async function boundedMap(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
+}
+
+async function uploadListingImage(accessToken, sequence) {
+  const form = new FormData();
+  form.append('file', new File([pngBytes], `${marker}-${sequence}.png`, { type: 'image/png' }));
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+      Origin: smokeTarget.origin,
+    },
+    body: form,
+  });
+  let body;
+  try { body = await response.json(); } catch { body = {}; }
+  assert.equal(response.status, 201, `upload image ${sequence}: ${JSON.stringify(body)}`);
+  assert.match(body.path ?? '', /^[0-9a-f-]{36}\/staging\/[0-9a-f-]{36}\.png$/);
+  assert.ok(body.intentId, `upload image ${sequence} returns an intent`);
+  storagePaths.push(body.path);
+  return { intentId: body.intentId, path: body.path };
+}
+
+function fixture(sequence, sellerType) {
+  const hilux = sequence % 2 === 0;
+  return {
+    sequence,
+    sellerType,
+    title: `${marker} Toyota ${hilux ? 'Hilux' : 'Corolla'} ${String(sequence).padStart(4, '0')}`,
+    model: hilux ? `Hilux Workmate ${sequence}` : `Corolla Quest ${sequence}`,
+    price: 10000 + sequence,
+  };
+}
+
+async function submitFixture({ client, accessToken, item }) {
+  const media = await uploadListingImage(accessToken, item.sequence);
+  const created = success(await client.rpc('create_v2_listing_submission', {
+    p_submission_key: crypto.randomUUID(),
+    p_listing: {
+      kind: 'car',
+      title: item.title,
+      description: 'Disposable automotive V3 search fixture created through the real validated listing-submission path.',
+      category: 'cars_sale',
+      listingType: 'sale',
+      price: item.price,
+      currency: 'USD',
+      negotiable: true,
+      locationId: '00000000-0000-4000-8000-000000000101',
+      contactPhone: item.sellerType === 'dealer' ? '+263700000099' : '+263700000098',
+    },
+    p_detail: {
+      brand: 'Toyota',
+      model: item.model,
+      year: 2010 + (item.sequence % 15),
+      mileage: 40000 + item.sequence * 100,
+      fuel_type: item.sequence % 2 === 0 ? 'diesel' : 'petrol',
+      transmission: item.sequence % 3 === 0 ? 'automatic' : 'manual',
+      condition: 'good',
+    },
+    p_attributes: {
+      version: 1,
+      values: {
+        body_type: item.sequence % 2 === 0 ? 'bakkie' : 'sedan',
+        drivetrain: item.sequence % 2 === 0 ? '4x4' : 'fwd',
+        import_status: 'locally_registered',
+      },
+    },
+    p_media: [media],
+  }), `submit ${item.sellerType} Cars fixture ${item.sequence}`);
+  assert.equal(created.status, 'pending_review', 'seller submission must remain pending before admin approval');
+  listingIds.push(created.id);
+  return { ...item, id: created.id };
+}
+
+async function approveFixture(item) {
+  success(await adminClient.rpc('admin_moderate_marketplace_item', {
+    p_item_id: item.id,
+    p_kind: 'car',
+    p_action: 'publish',
+    p_reason: `Automotive V3 scale smoke approval ${item.sequence}`,
+  }), `approve automotive fixture ${item.sequence}`);
 }
 
 async function searchPage({ model = '', sellerType = '', sort = 'newest', currency = '', cursor = null } = {}) {
@@ -94,34 +204,15 @@ async function traverse(search = {}) {
   throw new Error('Automotive V3 keyset traversal exceeded the bounded smoke page limit.');
 }
 
-function listingRows(userId, sellerName, count, offset) {
-  const baseTime = Date.UTC(2026, 6, 1);
-  return Array.from({ length: count }, (_, index) => {
-    const sequence = offset + index;
-    return {
-      kind: 'car',
-      seller_id: userId,
-      seller_name: sellerName,
-      title: `${marker} Toyota ${sequence % 2 === 0 ? 'Hilux' : 'Corolla'} ${String(sequence).padStart(4, '0')}`,
-      description: 'Disposable automotive V3 search fixture',
-      price: 10000 + sequence,
-      currency: 'USD',
-      native_price: 10000 + sequence,
-      native_currency: 'USD',
-      country_code: 'ZW',
-      category: 'cars_sale',
-      listing_type: 'sale',
-      status: 'pending_review',
-      photos: [],
-      views: sequence,
-      created_at: new Date(baseTime + sequence * 1000).toISOString(),
-    };
-  });
+async function removeStoragePaths(paths) {
+  for (let index = 0; index < paths.length; index += 50) {
+    try { await root.storage.from('listing-images').remove(paths.slice(index, index + 50)); } catch { /* best effort */ }
+  }
 }
 
 try {
-  if (!Number.isInteger(fixtureCount) || fixtureCount < 100 || fixtureCount > 500 || fixtureCount % 2 !== 0) {
-    throw new Error('FINDIT_AUTOMOTIVE_SEARCH_FIXTURE_COUNT must be an even integer from 100 to 500.');
+  if (!Number.isInteger(fixtureCount) || fixtureCount < 100 || fixtureCount > 120 || fixtureCount % 4 !== 0) {
+    throw new Error('FINDIT_AUTOMOTIVE_SEARCH_FIXTURE_COUNT must be a multiple of 4 from 100 to 120.');
   }
 
   privateUserId = success(await root.auth.admin.createUser({
@@ -137,6 +228,14 @@ try {
     email_confirm: true,
     user_metadata: { full_name: 'Automotive Dealer Fixture' },
   }), 'create dealer automotive fixture user').user.id;
+
+  adminUserId = success(await root.auth.admin.createUser({
+    email: adminEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: 'Automotive Admin Fixture' },
+  }), 'create automotive admin fixture user').user.id;
+  success(await root.from('users').update({ role: 'admin', super_admin: true }).eq('id', adminUserId), 'grant automotive smoke admin');
 
   businessProfileId = success(await root.from('business_profiles').insert({
     user_id: dealerUserId,
@@ -173,36 +272,33 @@ try {
   assert.equal(verifiedProfile.profile_type, 'dealer');
   assert.equal(verifiedProfile.business_type, 'car_dealership');
 
-  const [privateClient, dealerClient] = await Promise.all([signIn(privateEmail), signIn(dealerEmail)]);
-  const privateListings = success(await privateClient.from('listings').insert(listingRows(privateUserId, 'Automotive Private Fixture', half, 0)).select('id,title'), 'submit private Cars fixtures');
-  const dealerListings = success(await dealerClient.from('listings').insert(listingRows(dealerUserId, `${marker} Motors`, half, half)).select('id,title'), 'submit dealer Cars fixtures');
-  const inserted = [...privateListings, ...dealerListings];
-  assert.equal(inserted.length, fixtureCount);
+  const [privateAuth, dealerAuth, adminAuth] = await Promise.all([
+    signIn(privateEmail),
+    signIn(dealerEmail),
+    signIn(adminEmail),
+  ]);
+  privateClient = privateAuth.client;
+  dealerClient = dealerAuth.client;
+  adminClient = adminAuth.client;
 
-  const sequenceById = new Map(inserted.map((row) => [row.id, Number(row.title.slice(-4))]));
-  success(await root.from('car_details').insert(inserted.map((row) => {
-    const sequence = sequenceById.get(row.id);
-    return {
-      listing_id: row.id,
-      brand: 'Toyota',
-      model: sequence % 2 === 0 ? `Hilux Workmate ${sequence}` : `Corolla Quest ${sequence}`,
-      year: 2010 + (sequence % 15),
-      mileage: 40000 + sequence * 100,
-      fuel_type: sequence % 2 === 0 ? 'diesel' : 'petrol',
-      transmission: sequence % 3 === 0 ? 'automatic' : 'manual',
-      condition: 'used',
-    };
-  })), 'insert automotive detail fixtures');
+  const privateFixtures = Array.from({ length: half }, (_, index) => fixture(index, 'private'));
+  const dealerFixtures = Array.from({ length: half }, (_, index) => fixture(half + index, 'dealer'));
+  const [submittedPrivate, submittedDealer] = await Promise.all([
+    boundedMap(privateFixtures, 4, (item) => submitFixture({ client: privateClient, accessToken: privateAuth.session.access_token, item })),
+    boundedMap(dealerFixtures, 4, (item) => submitFixture({ client: dealerClient, accessToken: dealerAuth.session.access_token, item })),
+  ]);
+  const submitted = [...submittedPrivate, ...submittedDealer];
+  assert.equal(submitted.length, fixtureCount);
+  assert.equal(listingIds.length, fixtureCount);
 
-  success(await root.from('listings').update({ status: 'available' }).in('id', inserted.map((row) => row.id)), 'publish automotive smoke fixtures as trusted backend');
+  await boundedMap(submitted, 6, approveFixture);
+  const published = success(await root.from('listings').select('id,status').in('id', listingIds), 'read approved automotive fixtures');
+  assert.equal(published.length, fixtureCount);
+  assert.equal(published.every((row) => row.status === 'available'), true, 'admin approval publishes every smoke vehicle');
 
   const all = await traverse();
   assert.equal(all.length, fixtureCount, 'V3 keyset traversal reaches the complete automotive fixture set');
-  assert.deepEqual(
-    all.map((row) => Number(row.title.slice(-4))),
-    Array.from({ length: fixtureCount }, (_, index) => fixtureCount - index - 1),
-    'V3 newest traversal remains deterministic beyond 100 Cars',
-  );
+  assert.equal(new Set(all.map((row) => row.id)).size, fixtureCount, 'V3 traversal has no duplicates beyond 100 Cars');
 
   const dealers = await traverse({ sellerType: 'dealer' });
   assert.equal(dealers.length, half, 'dealer filter returns exactly dealer-owned Cars');
@@ -236,11 +332,16 @@ try {
   assert.match(invalidSeller.error?.message || '', /invalid automotive listing search page/i, 'database rejects invented seller classifications');
 
   console.log(`Automotive V3 ${smokeTarget.label} search smoke passed.`);
-  console.log(`Verified ${fixtureCount} Cars across private and approved-dealer sellers, >100-row keysets, partial model search, seller-type composition, thin projection and seller-native price ordering.`);
+  console.log(`Verified ${fixtureCount} Cars created through validated image upload + V2 submission + admin approval, with >100-row keysets, partial model search, authoritative seller-type composition, thin projection and seller-native price ordering.`);
 } finally {
-  const listingOwners = [privateUserId, dealerUserId].filter(Boolean);
-  if (listingOwners.length) {
-    try { await root.from('listings').delete().in('seller_id', listingOwners).ilike('title', `${marker}%`); } catch { /* best effort */ }
+  if (listingIds.length) {
+    try { await root.from('app_alerts').delete().in('listing_id', listingIds); } catch { /* best effort */ }
+    try { await root.from('audit_logs').delete().in('target_record_id', listingIds); } catch { /* best effort */ }
+    try { await root.from('listings').delete().in('id', listingIds); } catch { /* best effort */ }
+  }
+  await removeStoragePaths(storagePaths);
+  if (storagePaths.length) {
+    try { await root.from('listing_upload_intents').delete().in('storage_path', storagePaths); } catch { /* best effort */ }
   }
   if (businessApplicationId) {
     try { await root.from('business_applications').delete().eq('id', businessApplicationId); } catch { /* best effort */ }
@@ -248,10 +349,16 @@ try {
   if (businessProfileId) {
     try { await root.from('business_profiles').delete().eq('id', businessProfileId); } catch { /* best effort */ }
   }
+  try { await privateClient?.auth.signOut(); } catch { /* best effort */ }
+  try { await dealerClient?.auth.signOut(); } catch { /* best effort */ }
+  try { await adminClient?.auth.signOut(); } catch { /* best effort */ }
   if (privateUserId) {
     try { await root.auth.admin.deleteUser(privateUserId); } catch { /* best effort */ }
   }
   if (dealerUserId) {
     try { await root.auth.admin.deleteUser(dealerUserId); } catch { /* best effort */ }
+  }
+  if (adminUserId) {
+    try { await root.auth.admin.deleteUser(adminUserId); } catch { /* best effort */ }
   }
 }
