@@ -20,14 +20,19 @@ const MAX_COMPATIBILITY_DIMENSION = 4096;
 const COMPATIBILITY_CODES = new Set(['unsupported_image', 'mime_mismatch']);
 
 export async function submitListing(ownerId, input) {
-  const { data: allowed, error } = await supabase.rpc('can_publish_in_category', {
-    p_category: input.kind,
-  });
-  if (error) throw error;
-  if (!allowed) {
-    const failure = new Error('Your business is not approved to publish in this category.');
-    failure.code = 'BUSINESS_CATEGORY_NOT_APPROVED';
-    throw failure;
+  // Automotive private sellers submit directly into the existing moderated
+  // listing pipeline. Other dormant marketplace kinds keep their curated
+  // business gate until their future launch policy is explicitly designed.
+  if (input.kind !== 'car') {
+    const { data: allowed, error } = await supabase.rpc('can_publish_in_category', {
+      p_category: input.kind,
+    });
+    if (error) throw error;
+    if (!allowed) {
+      const failure = new Error('Your business is not approved to publish in this category.');
+      failure.code = 'BUSINESS_CATEGORY_NOT_APPROVED';
+      throw failure;
+    }
   }
   return insertListingSubmission(normalizeListingSubmission(ownerId, input));
 }
@@ -175,11 +180,6 @@ export async function resolveListingImages(values) {
   return photos.map((value) => signedByPath.get(value) ?? safeLegacyUrl(value)).filter(Boolean);
 }
 
-/**
- * Hydrates only the cover image required by marketplace cards. Full photo path
- * metadata is retained for trusted boundaries, but non-visible gallery images
- * are not signed until a detail or edit surface actually needs them.
- */
 export async function hydrateListingCardImages(rows) {
   const listings = Array.isArray(rows) ? rows : [];
   const coverValues = listings.map(firstDisplayablePhoto);
