@@ -120,8 +120,6 @@ export default function ListingCard({
     availability && { label: availability, variant: 'destructive' },
   ].filter(Boolean);
   const enquiryEligible = ['available', 'under_offer'].includes(listing.status);
-  // Public rows carry only the has_contact_* flags; owner rows also carry the
-  // values. Either is enough to know the affordance should render.
   const canCall = Boolean(listing.contact_phone || listing.has_contact_phone);
   const canWhatsApp = Boolean(listing.contact_whatsapp || listing.has_contact_whatsapp);
   const canEmail = Boolean(listing.contact_email || listing.seller_email || listing.has_contact_email);
@@ -129,6 +127,16 @@ export default function ListingCard({
   const actions = layout === 'browse' && (canCall || canWhatsApp || canEmail || canMessage)
     ? <ContactButtons listing={listing} type={type} placement="browse" />
     : null;
+  const approvedDealer = type === 'car' && listing.seller_type === 'dealer' && Boolean(listing.dealer_profile_id);
+  const sellerName = approvedDealer ? (listing.dealer_company_name || listing.seller_name) : listing.seller_name;
+  const sellerLabel = type !== 'car'
+    ? 'Seller'
+    : approvedDealer
+      ? 'PeekaListing dealer'
+      : listing.seller_type === 'private'
+        ? 'Private seller'
+        : 'Seller';
+  const sellerPath = approvedDealer ? `/dealer/${encodeURIComponent(listing.dealer_profile_id)}` : null;
 
   return (
     <>
@@ -145,7 +153,9 @@ export default function ListingCard({
         badges={badges}
         save={{ active: liked, onToggle: toggleLike }}
         tour={tourSummary(listing)}
-        sellerName={listing.seller_name}
+        sellerName={sellerName}
+        sellerLabel={sellerLabel}
+        sellerPath={sellerPath}
         actions={actions}
         layout={layout}
         className={className}
