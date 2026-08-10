@@ -1,0 +1,184 @@
+name: Deploy Automotive Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY to deploy the isolated automotive staging environment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: peekalisting-automotive-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: cloudflare-automotive-staging
+      url: https://cars-staging.peekalisting.com
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT: peekalisting-automotive-staging
+      CLOUDFLARE_STAGING_DOMAIN: cars-staging.peekalisting.com
+      NODE_ENV: production
+      VITE_MODE: staging
+      VITE_DEPLOY_ENV: staging
+      VITE_BASE_PATH: /
+      VITE_PUBLIC_APP_ORIGIN: https://cars-staging.peekalisting.com
+      PEEKALISTING_AUTOMOTIVE_STAGING_ORIGIN: https://cars-staging.peekalisting.com
+      PEEKALISTING_EXPECTED_PROJECT_REF: ${{ vars.PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_AUTH_GOOGLE_ENABLED: ${{ vars.VITE_AUTH_GOOGLE_ENABLED || 'false' }}
+      VITE_AUTH_APPLE_ENABLED: "false"
+      VITE_FEATURE_BUSINESS_PROFILES: "true"
+      VITE_FEATURE_MESSAGING: "true"
+      VITE_FEATURE_ESSENTIAL_NOTIFICATIONS: "true"
+      VITE_FEATURE_GOOGLE_OAUTH: ${{ vars.VITE_FEATURE_GOOGLE_OAUTH || 'false' }}
+      VITE_FEATURE_MAPS: ${{ vars.VITE_FEATURE_MAPS || 'false' }}
+      VITE_FEATURE_CURRENT_LOCATION: ${{ vars.VITE_FEATURE_CURRENT_LOCATION || 'false' }}
+      VITE_FEATURE_MANUAL_LOCATION: "true"
+      VITE_FEATURE_REPORTING: "true"
+      VITE_MAPTILER_PUBLIC_KEY: ${{ vars.VITE_MAPTILER_PUBLIC_KEY }}
+      VITE_MAPTILER_STYLE_ID: ${{ vars.VITE_MAPTILER_STYLE_ID || 'streets-v4' }}
+      VITE_WEB_PUSH_PUBLIC_KEY: ${{ vars.VITE_WEB_PUSH_PUBLIC_KEY }}
+      VITE_FEATURE_CURRENCY_CONVERSION: "false"
+      VITE_FEATURE_PHONE_VERIFICATION: "false"
+      VITE_FEATURE_INTERNATIONAL_LISTING: "false"
+      VITE_FEATURE_SERVICE_RADIUS: "false"
+      VITE_FEATURE_LISTING_EXPIRY: "false"
+      VITE_FEATURE_LISTING_FRESHNESS_REMINDERS: "false"
+      VITE_FEATURE_TOURS: ${{ vars.VITE_FEATURE_TOURS || 'false' }}
+      VITE_FEATURE_TOURS_PREVIEW: "false"
+      VITE_FEATURE_PREVIEW_FIXTURES: "false"
+      VITE_PREVIEW_AUTH_BYPASS: "false"
+      VITE_FEATURE_PAYMENTS: "false"
+      VITE_FEATURE_SUBSCRIPTIONS: "false"
+      VITE_FEATURE_ESCROW: "false"
+      VITE_FEATURE_PREMIUM_LISTINGS: "false"
+      VITE_FEATURE_AI_MODERATION: "false"
+      VITE_FEATURE_AI_BAN_EVASION: "false"
+      VITE_FEATURE_AI_TICKET_TRIAGE: "false"
+      VITE_FEATURE_AI_SUPPORT_CHAT: "false"
+      VITE_FEATURE_SCHEDULED_REMINDERS: "false"
+      VITE_FEATURE_MARKETING_EMAILS: "false"
+      TOURS_BACKEND_ENABLED: ${{ vars.TOURS_BACKEND_ENABLED || 'false' }}
+      FINDIT_TOURS_WORKERS_ENABLED: ${{ vars.FINDIT_TOURS_WORKERS_ENABLED || 'false' }}
+      FINDIT_TOURS_RELEASE_ACCEPTED: "false"
+      FINDIT_TOUR_PROCESSOR_MODE: github-actions
+      FINDIT_TOUR_CLEANUP_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CLEANUP_WORKER_SECRET }}
+      FINDIT_TOUR_CACHE_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CACHE_WORKER_SECRET }}
+      FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET }}
+      FINDIT_ESSENTIAL_NOTIFICATIONS_WORKERS_ENABLED: ${{ vars.FINDIT_ESSENTIAL_NOTIFICATIONS_WORKERS_ENABLED || 'false' }}
+      FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET: ${{ secrets.FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET }}
+      FINDIT_RECOMMENDATION_WORKERS_ENABLED: "false"
+
+    steps:
+      - name: Check out exact main head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Guard isolated automotive targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$PEEKALISTING_EXPECTED_PROJECT_REF"
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_ANON_KEY"
+          test "$CLOUDFLARE_PAGES_PROJECT" = "peekalisting-automotive-staging"
+          test "$CLOUDFLARE_STAGING_DOMAIN" = "cars-staging.peekalisting.com"
+          test "$VITE_SUPABASE_URL" = "https://${PEEKALISTING_EXPECTED_PROJECT_REF}.supabase.co"
+          test "$PEEKALISTING_EXPECTED_PROJECT_REF" != "bwgklpxoetrrkutottdb"
+          test "$PEEKALISTING_EXPECTED_PROJECT_REF" != "jvbpxnfxkptuexgssplj"
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --ignore-scripts
+
+      - name: Validate automotive staging environment
+        run: npm run validate:env
+
+      - name: Run automotive contract gate
+        run: >-
+          node --test
+          ./tests/automotive*.test.mjs
+          ./tests/publicAutomotiveSearchContracts.test.mjs
+          ./tests/publicLaunchScopeContracts.test.mjs
+          ./tests/shippingTransportSeparationContracts.test.mjs
+          ./tests/listingPublicationJourneyContracts.test.mjs
+          ./tests/publicSearchCancellationContracts.test.mjs
+          ./tests/publicSearchCardPayloadContracts.test.mjs
+          ./tests/publicListingsCancellationContracts.test.mjs
+          ./tests/tourMilestone4ListingIntegration.test.mjs
+
+      - name: Build automotive staging PWA
+        run: npm run build
+
+      - name: Verify deployment security contracts
+        run: npm run verify:deployment-security
+
+      - name: Prepare Pages Functions runtime
+        run: node ./scripts/prepare-pages-functions-runtime.mjs
+
+      - name: Stamp exact build identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > dist/current-build.txt <<EOF
+          product=PeekaListing Automotive
+          environment=staging
+          host=cars-staging.peekalisting.com
+          branch=main
+          sha=$GITHUB_SHA
+          run_id=$GITHUB_RUN_ID
+          backend=$PEEKALISTING_EXPECTED_PROJECT_REF
+          EOF
+          cat > dist/staging-build.json <<EOF
+          {"product":"PeekaListing Automotive","environment":"staging","host":"cars-staging.peekalisting.com","branch":"main","sha":"$GITHUB_SHA","run_id":"$GITHUB_RUN_ID","backend":"$PEEKALISTING_EXPECTED_PROJECT_REF"}
+          EOF
+          test -f dist/index.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+
+      - name: Deploy isolated automotive staging
+        run: bash ./scripts/deploy-canonical-cloudflare-staging.sh
+
+      - name: Configure isolated staging metadata bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg url "${VITE_SUPABASE_URL}" \
+            --arg key "${VITE_SUPABASE_ANON_KEY}" \
+            '{deployment_configs:{preview:{env_vars:{DEPLOYMENT_ENV:{type:"plain_text",value:"automotive-staging-preview"},SUPABASE_URL:{type:"plain_text",value:$url},SUPABASE_PUBLISHABLE_KEY:{type:"secret_text",value:$key}}},production:{env_vars:{DEPLOYMENT_ENV:{type:"plain_text",value:"automotive-staging"},SUPABASE_URL:{type:"plain_text",value:$url},SUPABASE_PUBLISHABLE_KEY:{type:"secret_text",value:$key}}}}}')"
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "${payload}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT}" \
+            | jq -e '.success == true' >/dev/null
+
+      - name: Verify hosted automotive staging
+        run: npm run verify:cloudflare-staging
