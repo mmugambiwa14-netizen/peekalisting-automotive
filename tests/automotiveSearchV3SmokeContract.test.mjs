@@ -34,7 +34,7 @@ test('automotive V3 smoke exercises real private and approved-dealer database pa
   assert.match(smoke, /must not repeat/);
   assert.match(smoke, /sort: 'price_asc', currency: 'USD'/);
   assert.match(smoke, /verified_private/);
-  assert.match(smoke, /storagePaths\.slice\(index, index \+ 50\)/);
+  assert.match(smoke, /paths\.slice\(index, index \+ 50\)/);
   assert.match(smoke, /business_applications.*delete|from\('business_applications'\)\.delete/s);
   assert.match(smoke, /business_profiles.*delete|from\('business_profiles'\)\.delete/s);
   assert.match(smoke, /listing_upload_intents.*delete|from\('listing_upload_intents'\)\.delete/s);
