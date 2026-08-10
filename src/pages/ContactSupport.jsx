@@ -70,7 +70,7 @@ export default function ContactSupport() {
               {confirmation.referenceId}
             </p>
             <p className="text-sm text-muted-foreground">
-              FindIt is operated by a small team. Safety issues are prioritised, but this is not an emergency service.
+              PeekaListing is operated by a small team. Safety issues are prioritised, but this is not an emergency service.
             </p>
             <Button onClick={() => navigate('/help')}>Back to Help &amp; Safety</Button>
           </CardContent>
