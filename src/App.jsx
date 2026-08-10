@@ -35,6 +35,7 @@ const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Home = lazy(() => import('@/pages/Home'));
 const Search = lazy(() => import('@/pages/Search'));
+const Dealers = lazy(() => import('@/pages/Dealers'));
 const CreateListing = lazy(() => import('@/pages/CreateListing'));
 const CuratedCreateService = lazy(() => import('@/pages/CuratedCreateService'));
 const Saved = lazy(() => import('@/pages/Saved'));
@@ -134,10 +135,7 @@ const AuthenticatedApp = () => {
   const mfaGate = useMfaGate({ isAuthenticated, authChecked });
 
   const isOAuthCallbackRoute = location.pathname.replace(/\/+$/, '').endsWith('/auth/callback');
-  if (isOAuthCallbackRoute) {
-    return <Suspense fallback={<LoadingScreen />}><OAuthCallback /></Suspense>;
-  }
-
+  if (isOAuthCallbackRoute) return <Suspense fallback={<LoadingScreen />}><OAuthCallback /></Suspense>;
   if (isLoadingPublicSettings || isLoadingAuth) return <LoadingScreen />;
   if (blockedAccount) return <AccountBlocked status={blockedAccount.status} reason={blockedAccount.reason} banUntil={blockedAccount.banUntil} />;
   if (authError) {
@@ -162,6 +160,7 @@ const AuthenticatedApp = () => {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/dealers" element={<Dealers />} />
           <Route path="/property/:id" element={<PropertyDetail />} />
           <Route path="/car/:id" element={<CarDetail />} />
           <Route path="/machinery/:id" element={<MachineryDetail />} />
