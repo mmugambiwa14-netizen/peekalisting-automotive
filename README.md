@@ -125,8 +125,8 @@ All AI agents and contributors must read [`AGENTS.md`](AGENTS.md) before making 
 
 ## Current repository state
 
-PeekaListing Automotive is now isolated as its own product repository and is ready for the automotive-focused product pass.
+PeekaListing Automotive is isolated as its own product repository. Automotive CI is active on `main` and pull requests, while deployment remains deliberately fail-closed.
 
-The existing application foundation is present, while repository-specific CI and deployment workflows are intentionally inactive until they are reviewed and configured for this product and its environments.
+The manual automotive staging workflow targets only `peekalisting-automotive-staging` at `cars-staging.peekalisting.com` and requires a dedicated automotive Supabase project. Historical workflows preserved under `.github/source-workflows/` remain inactive reference material and must not be re-enabled wholesale.
 
 Development should preserve working platform capabilities while reshaping the customer-facing experience around vehicles, dealerships, automotive services and Peeks.
