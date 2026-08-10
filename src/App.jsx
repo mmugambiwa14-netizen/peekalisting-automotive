@@ -36,6 +36,7 @@ const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Home = lazy(() => import('@/pages/Home'));
 const Search = lazy(() => import('@/pages/Search'));
 const Dealers = lazy(() => import('@/pages/Dealers'));
+const DealerOnboarding = lazy(() => import('@/pages/DealerOnboarding'));
 const CreateListing = lazy(() => import('@/pages/CreateListing'));
 const CuratedCreateService = lazy(() => import('@/pages/CuratedCreateService'));
 const Saved = lazy(() => import('@/pages/Saved'));
@@ -194,6 +195,7 @@ const AuthenticatedApp = () => {
             {featureFlags.messaging && <Route path="/chats" element={<Inquiries />} />}
             {featureFlags.messaging && <Route path="/chats/:conversationId" element={<Inquiries />} />}
             {featureFlags.businessProfiles && <Route path="/business-profiles" element={<BusinessProfiles />} />}
+            {featureFlags.businessProfiles && <Route path="/dealer-onboarding" element={<DealerOnboarding />} />}
             {featureFlags.essentialNotifications && <Route path="/notifications" element={<NotificationCenter />} />}
           </Route>
         </Route>
