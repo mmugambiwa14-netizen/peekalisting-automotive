@@ -167,7 +167,7 @@ const AuthenticatedApp = () => {
           <Route path="/machinery/:id" element={<MachineryDetail />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
           {featureFlags.businessProfiles && <Route path="/business/:id" element={<PublicBusinessProfile />} />}
-          {featureFlags.businessProfiles && <Route path="/dealer/:id" element={<PublicBusinessProfile />} />}
+          <Route path="/dealer/:id" element={<PublicBusinessProfile />} />
           <Route path="/services" element={<Services />} />
           <Route path="/service/:id" element={<ServiceDetail />} />
           {(featureFlags.tours || featureFlags.toursPreview) && <Route path="/peek" element={featureFlags.tours ? <Tours /> : <ToursPlaceholder />} />}
@@ -195,7 +195,7 @@ const AuthenticatedApp = () => {
             {featureFlags.messaging && <Route path="/chats" element={<Inquiries />} />}
             {featureFlags.messaging && <Route path="/chats/:conversationId" element={<Inquiries />} />}
             {featureFlags.businessProfiles && <Route path="/business-profiles" element={<BusinessProfiles />} />}
-            {featureFlags.businessProfiles && <Route path="/dealer-onboarding" element={<DealerOnboarding />} />}
+            <Route path="/dealer-onboarding" element={<DealerOnboarding />} />
             {featureFlags.essentialNotifications && <Route path="/notifications" element={<NotificationCenter />} />}
           </Route>
         </Route>
