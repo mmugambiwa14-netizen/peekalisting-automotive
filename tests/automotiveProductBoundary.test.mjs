@@ -41,6 +41,7 @@ test('launch taxonomy is narrower than the reusable vehicle ontology', async () 
   assert.match(config, /defaults\.offer_type.*AUTOMOTIVE_LAUNCH_OFFER/);
   assert.match(config, /defaults\.parts_family/);
   assert.match(config, /Array\.isArray\(defaults\.segments\)/);
+  assert.match(config, /AUTOMOTIVE_SELLER_TYPES/);
   assert.match(step, /getCategoryTaxonomy\('car'/);
   assert.match(step, /launchVehicleCategoryOptions/);
   assert.match(step, /Submission is open; publication is controlled/);
@@ -69,35 +70,44 @@ test('private vehicle submission remains moderated and other domains remain cura
 });
 
 test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
-  const [search, filters, repository, migration, preview] = await Promise.all([
+  const [search, filters, repository, baseMigration, v3Migration, previewService, rollback] = await Promise.all([
     source('src/pages/Search.jsx'),
     source('src/components/search/VehicleFilters.jsx'),
     source('src/repositories/publicListingsRepository.js'),
     source('supabase/migrations/20260810151000_automotive_search_projection.sql'),
-    source('src/services/localPreviewListings.js'),
+    source('supabase/migrations/20260810154000_automotive_model_seller_search.sql'),
+    source('src/services/publicListingsService.js'),
+    source('supabase/rollback/20260810154000_automotive_model_seller_search.rollback.sql'),
   ]);
 
   assert.match(search, /const TYPE = 'car'/);
-  for (const field of ['bodyType', 'drivetrain', 'importStatus', 'minYear', 'maxYear', 'maxMileage', 'peekOnly']) {
+  for (const field of ['model', 'sellerType', 'bodyType', 'drivetrain', 'importStatus', 'minYear', 'maxYear', 'maxMileage', 'peekOnly']) {
     assert.match(search, new RegExp(field));
     assert.match(filters, new RegExp(field));
-    assert.match(preview, new RegExp(field));
   }
-  assert.match(repository, /public_listing_search_card_page_v2/);
-  assert.match(migration, /attributes -> 'values' ->> 'body_type'/);
-  assert.match(migration, /attributes -> 'values' ->> 'drivetrain'/);
-  assert.match(migration, /attributes -> 'values' ->> 'import_status'/);
-  assert.match(migration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
-  assert.match(migration, /tour\.moderation_status = 'approved'/);
-  assert.match(migration, /tour\.published_at is not null/);
-  assert.match(migration, /p_max_mileage/);
-  assert.match(migration, /kind = 'car'::public\.listing_kind/);
-  assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
-  assert.match(migration, /car\.transmission::text = p_transmission/);
-  const privateReturnStart = migration.indexOf('returns table (');
-  const privateReturnEnd = migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
+  assert.match(filters, /Any seller/);
+  assert.match(repository, /public_listing_search_card_page_v3/);
+  assert.match(repository, /p_model: request\.model/);
+  assert.match(repository, /p_seller_type: request\.sellerType/);
+  assert.match(baseMigration, /attributes -> 'values' ->> 'body_type'/);
+  assert.match(baseMigration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
+  assert.match(v3Migration, /normalized_model/);
+  assert.match(v3Migration, /normalized_seller_type not in \('', 'dealer', 'private'\)/);
+  assert.match(v3Migration, /profile\.business_type = 'car_dealership'/);
+  assert.match(v3Migration, /profile\.verified = true/);
+  assert.match(v3Migration, /approval\.category = 'car'/);
+  assert.match(v3Migration, /approval\.status = 'approved'/);
+  assert.match(v3Migration, /listing\.car_model ilike/);
+  assert.match(v3Migration, /case when listing\.is_dealer then 'dealer' else 'private' end/);
+  assert.match(v3Migration, /listing\.has_current_peek/);
+  assert.match(previewService, /previewSellerType/);
+  assert.match(previewService, /request\.model/);
+  assert.match(previewService, /request\.sellerType/);
+  assert.match(rollback, /drop function if exists public\.public_listing_search_card_page_v3/);
+  const privateReturnStart = v3Migration.indexOf('returns table (');
+  const privateReturnEnd = v3Migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
-  assert.doesNotMatch(migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
+  assert.doesNotMatch(v3Migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
 });
 
 test('automotive Peek surfaces ask for observable evidence instead of becoming a generic media feed', async () => {
