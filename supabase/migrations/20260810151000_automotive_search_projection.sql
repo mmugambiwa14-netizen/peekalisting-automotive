@@ -168,8 +168,14 @@ begin
       'usage_hours', machinery.usage_hours
     ) end,
     exists (
-      select 1 from public.listing_tour_slots slot
-      where slot.listing_id = listing.id and slot.current_tour_id is not null
+      select 1
+      from public.listing_tour_slots slot
+      join public.listing_tours tour on tour.id = slot.current_tour_id
+      where slot.listing_id = listing.id
+        and tour.status = 'ready'
+        and tour.moderation_status = 'approved'
+        and tour.published_at is not null
+        and tour.deleted_at is null
     ),
     case p_sort
       when 'newest' then listing.created_at::text
@@ -196,8 +202,14 @@ begin
       or listing.search_document @@ websearch_to_tsquery('simple'::regconfig, normalized_query)
       or listing.title ilike '%' || escaped_query || '%' escape E'\\')
     and (not p_peek_only or exists (
-      select 1 from public.listing_tour_slots peek_slot
-      where peek_slot.listing_id = listing.id and peek_slot.current_tour_id is not null
+      select 1
+      from public.listing_tour_slots peek_slot
+      join public.listing_tours peek_tour on peek_tour.id = peek_slot.current_tour_id
+      where peek_slot.listing_id = listing.id
+        and peek_tour.status = 'ready'
+        and peek_tour.moderation_status = 'approved'
+        and peek_tour.published_at is not null
+        and peek_tour.deleted_at is null
     ))
     and (
       (p_kind = 'property' and property.listing_id is not null and (p_min_bedrooms is null or property.bedrooms >= p_min_bedrooms))
@@ -281,6 +293,6 @@ grant execute on function public.public_listing_search_card_page_v2(
 
 comment on function public.public_listing_search_card_page_v2(
   text,text,text,text,text,text,numeric,numeric,integer,text,text,text,text,text,text,text,integer,integer,integer,boolean,text,text,uuid,integer
-) is 'Bounded automotive-aware marketplace card search with deep vehicle facets, Peek availability, minimal public projection, privacy-safe location and keyset pagination.';
+) is 'Bounded automotive-aware marketplace card search with deep vehicle facets, publicly eligible Peek availability, minimal public projection, privacy-safe location and keyset pagination.';
 
 commit;
