@@ -38,7 +38,7 @@ test('public listing Search propagates cancellation through the thin keyset RPC 
   assert.match(serviceBlock, /enrichPublicListingCards\(cleanRows\)/);
 
   const repositoryBlock = between(listingRepository, 'export async function findPublicListingsPage', 'export async function findPublicListingTitleSuggestions');
-  assert.match(repositoryBlock, /let query = supabase\.rpc\('public_listing_search_card_page_v1'/);
+  assert.match(repositoryBlock, /supabase\.rpc\('public_listing_search_card_page_v3'/);
   assert.match(repositoryBlock, /if \(signal\) query = query\.abortSignal\(signal\)/);
 });
 
