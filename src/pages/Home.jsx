@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Bell, Camera, CarFront, Search, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Bell, Building2, Camera, CarFront, Search, ShieldCheck, Wrench } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { readStoredJson, removeStoredValue, writeStoredJson } from '@/lib/browserStorage';
 import BrandLogo from '@/components/BrandLogo';
@@ -156,6 +156,14 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="mt-10" aria-labelledby="automotive-ecosystem-title">
+          <div className="mb-4"><p className="findit-overline">Beyond the listing</p><h2 id="automotive-ecosystem-title" className="fluid-section-title mt-1">The automotive ecosystem around the car</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Move from discovery to a better-informed purchase, then find the businesses that can inspect, transport, maintain and support the vehicle.</p></div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <EcosystemCard to="/dealers" icon={Building2} title="Browse dealers" text="Explore PeekaListing-approved vehicle businesses and their current inventory." action="Find dealers" />
+            <EcosystemCard to="/services" icon={Wrench} title="Automotive services" text="Find pre-purchase inspection, diagnostics, tyres, repairs, bodywork, towing, transport and more." action="Find services" />
+          </div>
+        </section>
+
         <section className="mt-10 flex flex-col gap-4 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
           <div><p className="findit-overline">Selling a vehicle?</p><h2 className="mt-1 text-2xl font-black tracking-tight">Submit it free for review.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Private sellers can submit vehicles directly. Dealer approval unlocks dealership identity and business inventory capabilities.</p></div>
           <Link to="/post" className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-primary-foreground">Sell your car</Link>
@@ -167,4 +175,8 @@ export default function Home() {
 
 function EvidenceCard({ icon: Icon, title, text }) {
   return <article className="rounded-2xl border border-border bg-card p-5"><span className="locked-icon-tile h-11 w-11"><Icon className="h-5 w-5" /></span><h3 className="mt-4 font-extrabold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p></article>;
+}
+
+function EcosystemCard({ to, icon: Icon, title, text, action }) {
+  return <Link to={to} className="clay-card group rounded-3xl p-6 transition hover:-translate-y-0.5 hover:border-primary/30"><span className="locked-icon-tile h-12 w-12"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-xl font-extrabold tracking-tight">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p><span className="mt-5 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary">{action}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span></Link>;
 }
