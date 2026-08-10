@@ -1,10 +1,10 @@
 begin;
 
 -- Model is free text and buyers commonly search partial names such as "Hilux"
--- or "CX-5". pg_trgm is already part of the schema foundation, so index the
--- actual new predicate instead of duplicating the existing approval key index.
+-- or "CX-5". pg_trgm is isolated in the non-API extensions schema by migration
+-- 0082, so the operator class is explicitly schema-qualified here.
 create index if not exists idx_car_details_automotive_model_trgm
-  on public.car_details using gin (model gin_trgm_ops)
+  on public.car_details using gin (model extensions.gin_trgm_ops)
   where model is not null;
 
 create or replace function private.public_listing_search_card_page_v3(
