@@ -6,6 +6,7 @@ import { assertSmokeTarget } from './lib/smoke-target.mjs';
 const url = process.env.FINDIT_SUPABASE_URL ?? 'http://127.0.0.1:55321';
 const anonKey = process.env.FINDIT_SUPABASE_ANON_KEY;
 const secretKey = process.env.FINDIT_SUPABASE_SECRET_KEY;
+const appOrigin = process.env.FINDIT_SMOKE_APP_ORIGIN ?? 'http://localhost:5173';
 const smokeTarget = assertSmokeTarget(url, 'The automotive search V3 smoke test');
 if (!anonKey || !secretKey) throw new Error('A Supabase publishable key and secret key are required.');
 
@@ -76,7 +77,7 @@ async function uploadListingImage(accessToken, sequence) {
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${accessToken}`,
-      Origin: smokeTarget.origin,
+      Origin: appOrigin,
     },
     body: form,
   });
