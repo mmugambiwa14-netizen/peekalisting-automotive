@@ -1,0 +1,281 @@
+.findit-brand-mark {
+  @apply relative inline-flex items-center justify-center text-primary;
+}
+
+.findit-brand-mark::before {
+  content: '';
+  width: 1.58rem;
+  height: 1.58rem;
+  border-radius: 58% 58% 58% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, hsl(199 100% 67%), hsl(var(--primary)) 48%, hsl(226 94% 58%)) border-box;
+  border: 0.34rem solid transparent;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: drop-shadow(0 7px 14px hsl(var(--primary) / 0.3));
+}
+
+.findit-brand-mark::after {
+  content: '';
+  position: absolute;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: hsl(var(--background));
+  transform: translate(-0.02rem, -0.18rem);
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.08);
+}
+
+.locked-control {
+  @apply rounded-2xl border border-border bg-card/85;
+  background-image: linear-gradient(145deg, hsl(var(--surface-raised) / 0.94), hsl(var(--card) / 0.92));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.12),
+    0 1px 2px hsl(var(--clay-shadow-dark) / 0.06),
+    0 12px 30px hsl(var(--clay-shadow-dark) / 0.11);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.locked-control:hover {
+  border-color: hsl(var(--primary) / 0.28);
+}
+
+.locked-category-card {
+  @apply relative isolate overflow-hidden rounded-[1.35rem] border border-border bg-card;
+  background-image: linear-gradient(145deg, hsl(var(--surface-raised) / 0.96), hsl(var(--card)) 48%, hsl(var(--card)));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.12),
+    0 1px 2px hsl(var(--clay-shadow-dark) / 0.07),
+    0 18px 42px hsl(var(--clay-shadow-dark) / 0.14);
+}
+
+.locked-category-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 12% -46% 26%;
+  z-index: -1;
+  height: 72%;
+  border-radius: 999px;
+  background: hsl(var(--primary) / 0.2);
+  filter: blur(38px);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.locked-category-card:hover::after {
+  opacity: 1;
+}
+
+.locked-icon-tile {
+  @apply flex shrink-0 items-center justify-center rounded-xl border border-primary/30 text-primary;
+  background: linear-gradient(145deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.08));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.16),
+    0 9px 22px hsl(var(--primary) / 0.16);
+}
+
+.locked-segmented-control {
+  @apply inline-grid rounded-2xl border border-border bg-card/85 p-1;
+  background-image: linear-gradient(145deg, hsl(var(--surface-raised) / 0.9), hsl(var(--card) / 0.9));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.11),
+    0 10px 26px hsl(var(--clay-shadow-dark) / 0.1);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.locked-segmented-active {
+  @apply bg-primary text-primary-foreground;
+  background-image: linear-gradient(135deg, hsl(211 100% 68%), hsl(var(--primary)) 54%, hsl(225 92% 56%));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.26),
+    0 7px 20px hsl(var(--primary) / 0.3);
+}
+
+.findit-bottom-icon {
+  color: hsl(var(--muted-foreground));
+}
+
+.findit-bottom-icon[data-active='true'] {
+  color: hsl(var(--primary));
+  filter: drop-shadow(0 0 10px hsl(var(--primary) / 0.48));
+}
+
+.locked-map-panel {
+  @apply overflow-hidden rounded-[1.4rem] border border-border/80 bg-surface-secondary;
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.08),
+    0 20px 48px hsl(var(--clay-shadow-dark) / 0.2);
+}
+
+/* The map owns its canvas size. MapLibre changes the rendered viewport when
+ * users zoom or pan; the surrounding page and mobile navigation must not
+ * participate in that transform or reflow. */
+.findit-discover-map {
+  display: block;
+  height: clamp(540px, calc(var(--findit-viewport-height, 100dvh) - 270px), 720px);
+  min-height: 540px;
+  max-height: 720px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Detail pages use the same renderer and interaction model as Discover, but
+ * keep the location panel compact enough that the tab remains readable. */
+.findit-listing-location-map {
+  height: clamp(340px, 52vw, 480px);
+  min-height: 340px;
+  max-height: 480px;
+}
+
+.findit-map-marker {
+  display: flex;
+  height: 52px;
+  width: 46px;
+  cursor: pointer;
+  align-items: flex-start;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  will-change: transform;
+}
+
+.maplibregl-marker {
+  will-change: transform;
+}
+
+.findit-map-marker-pin {
+  position: relative;
+  display: flex;
+  height: 40px;
+  width: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid hsl(0 0% 100% / 0.9);
+  border-radius: 9999px;
+  color: white;
+  background: var(--marker-color);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.32),
+    0 5px 14px hsl(222 47% 4% / 0.5),
+    0 0 0 4px hsl(0 0% 100% / 0.08);
+  transform-origin: 50% 100%;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.findit-map-marker-pin::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid var(--marker-color);
+  transform: translateX(-50%);
+  filter: drop-shadow(0 3px 2px hsl(222 47% 4% / 0.3));
+}
+
+.findit-map-marker:hover .findit-map-marker-pin,
+.findit-map-marker:focus-visible .findit-map-marker-pin,
+.findit-map-marker[data-selected='true'] .findit-map-marker-pin {
+  transform: translateY(-2px) scale(1.12);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.36),
+    0 8px 20px hsl(222 47% 4% / 0.58),
+    0 0 0 5px hsl(0 0% 100% / 0.14);
+}
+
+.findit-map-marker:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+  border-radius: 9999px;
+}
+
+.findit-map-marker-icon {
+  display: flex;
+  height: 22px;
+  width: 22px;
+  align-items: center;
+  justify-content: center;
+}
+
+.locked-bottom-sheet {
+  @apply rounded-t-[1.75rem] border border-border/80 bg-card/95;
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.1),
+    0 -16px 42px hsl(var(--clay-shadow-dark) / 0.24);
+  backdrop-filter: blur(26px) saturate(145%);
+}
+
+.locked-page-header {
+  @apply sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-2xl;
+  box-shadow: 0 10px 30px hsl(var(--clay-shadow-dark) / 0.06);
+}
+
+.locked-list-row {
+  @apply rounded-2xl border border-border/80 bg-card/90;
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.08),
+    0 9px 24px hsl(var(--clay-shadow-dark) / 0.1);
+}
+
+.findit-hero-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.findit-hero-panel::before {
+  content: '';
+  position: absolute;
+  inset: -5rem 8% auto;
+  z-index: -1;
+  height: 18rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.16), hsl(199 100% 58% / 0.1));
+  filter: blur(68px);
+  pointer-events: none;
+}
+
+.findit-header-action {
+  @apply flex h-11 w-11 items-center justify-center rounded-xl border border-transparent text-muted-foreground;
+}
+
+.findit-header-action:hover {
+  border-color: hsl(var(--primary) / 0.16);
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+}
+
+.findit-active-nav-item {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.12);
+}
+
+.findit-auth-shell {
+  background-image:
+    radial-gradient(circle at 18% 4%, hsl(var(--primary) / 0.16), transparent 24rem),
+    radial-gradient(circle at 90% 92%, hsl(199 100% 56% / 0.08), transparent 24rem);
+}
+
+.dark .locked-control,
+.dark .locked-segmented-control {
+  background-image: linear-gradient(145deg, hsl(var(--surface-raised) / 0.76), hsl(var(--card) / 0.9));
+}
+
+.dark .locked-category-card {
+  background-image: linear-gradient(145deg, hsl(var(--surface-raised) / 0.68), hsl(var(--card)) 48%, hsl(var(--card)));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.07),
+    0 1px 2px hsl(var(--clay-shadow-dark) / 0.28),
+    0 20px 48px hsl(var(--clay-shadow-dark) / 0.36);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .locked-category-card::after {
+    transition: none;
+  }
+}

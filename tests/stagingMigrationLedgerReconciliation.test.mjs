@@ -1,0 +1,271 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const [
+  repair,
+  evidence,
+  repair0083,
+  evidence0083,
+  repair0084,
+  evidence0084,
+  repair0085,
+  evidence0085,
+  repair0087,
+  evidence0087,
+  repair0088,
+  evidence0088,
+  repair0089,
+  evidence0089,
+  repair0090,
+  evidence0090,
+  repair0091,
+  evidence0091,
+] = await Promise.all([
+  read('supabase/maintenance/reconcile_staging_migration_history_0077_0082.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0083.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0083-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0084.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0084-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0085.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0085-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0087.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0087-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0088.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0088-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0089.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0089-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0090.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0090-2026-07-30.md'),
+  read('supabase/maintenance/reconcile_staging_migration_history_0091.sql'),
+  read('docs/certification/staging-migration-ledger-reconciliation-0091-2026-07-30.md'),
+]);
+
+const mappings = [
+  ['0077', 'real_marketplace_view_counting', '7912fa31d66a3d0ee88c08c1bd040bb3', '1656'],
+  ['0078', 'service_catalog_recommendation_alignment', '1b7e1cadd527e661c33f7af2e436746c', '4618'],
+  ['0079', 'on_demand_recommendation_projection', 'e75c89ddee52cb538dc099259a9075db', '1899'],
+  ['0080', 'listing_detail_related_services_context', '12a1ad7ab6d477a7f8b79986ab07ba5b', '1705'],
+  ['0081', 'public_business_profile_view_security', '1e7fd9e2fe6f1c479ae91b163c3f0efa', '2393'],
+  ['0082', 'pg_trgm_extension_schema_security', 'b717618066f5730b9f7887b2bdfbe0ed', '423'],
+];
+
+test('staging ledger repair verifies exact migration identity before metadata changes', () => {
+  for (const [version, name, hash, length] of mappings) {
+    assert.match(repair, new RegExp(`'${version}'`));
+    assert.match(repair, new RegExp(name));
+    assert.match(repair, new RegExp(hash));
+    assert.match(repair, new RegExp(`\\b${length}\\b`));
+  }
+  assert.match(repair, /lock table supabase_migrations\.schema_migrations/i);
+  assert.match(repair, /md5\(array_to_string\(statements, E'\\n'\)\)/i);
+  assert.match(repair, /length\(array_to_string\(statements, E'\\n'\)\)/i);
+  assert.match(repair, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+});
+
+test('staging ledger repair changes version metadata only and fails closed on drift', () => {
+  assert.match(repair, /update supabase_migrations\.schema_migrations\s+set version = repair\.canonical_version/i);
+  assert.doesNotMatch(repair, /\bcreate\s+(?:table|function|view|index)\b/i);
+  assert.doesNotMatch(repair, /\balter\s+(?:table|function|view|extension)\b/i);
+  assert.doesNotMatch(repair, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+  assert.match(repair, /expected exactly one verified source row/i);
+  assert.match(repair, /canonical migration version % is already occupied/i);
+  assert.match(repair, /if canonical_rows = 1 and matching_rows = 1 and source_version = repair\.canonical_version then\s+continue;/i);
+});
+
+test('reconciliation evidence names staging and explicitly excludes production', () => {
+  assert.match(evidence, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence, /Production impact: none/);
+  assert.match(evidence, /production project/i);
+  assert.match(evidence, /remain(?:s)?(?: unchanged)? at\s+`0049`/i);
+  assert.match(evidence, /migration metadata\s+reconciliation, not a production migration/i);
+});
+
+test('0083 reconciliation verifies the applied index migration and updates metadata only', () => {
+  assert.match(repair0083, /where version = '0083'/i);
+  assert.match(repair0083, /foreign_key_covering_indexes/);
+  assert.match(repair0083, /1a5b9aba07f6fd7307d8ea6f9cb9bcc9/);
+  assert.match(repair0083, /length\(array_to_string\(statements, E'\\n'\)\) = 4801/i);
+  assert.match(repair0083, /set version = '0083'/i);
+  assert.match(repair0083, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0083, /\bcreate\s+(?:table|function|view|index)\b/i);
+  assert.doesNotMatch(repair0083, /\balter\s+(?:table|function|view|extension)\b/i);
+  assert.doesNotMatch(repair0083, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0083 evidence records a canonical 83-migration staging ledger and no production change', () => {
+  assert.match(evidence0083, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0083, /Canonical migration rows \| 83/);
+  assert.match(evidence0083, /Last version \| `0083`/);
+  assert.match(evidence0083, /Sequence mismatches \| 0/);
+  assert.match(evidence0083, /Remaining generated `20260730\.\.\.` versions \| 0/);
+  assert.match(evidence0083, /production[\s\S]{0,120}remains at migration\s+`0049`/i);
+});
+
+test('0084 reconciliation verifies exact recommendation index migration identity', () => {
+  assert.match(repair0084, /where version = '0084'/i);
+  assert.match(repair0084, /recommendation_foreign_key_covering_indexes/);
+  assert.match(repair0084, /07aa80888471117955790e5f04f6ae04/);
+  assert.match(repair0084, /length\(array_to_string\(statements, E'\\n'\)\) = 877/i);
+  assert.match(repair0084, /set version = '0084'/i);
+  assert.match(repair0084, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0084, /\bcreate\s+(?:table|function|view|index)\b/i);
+  assert.doesNotMatch(repair0084, /\balter\s+(?:table|function|view|extension)\b/i);
+  assert.doesNotMatch(repair0084, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0084 evidence records complete foreign key coverage and no production change', () => {
+  assert.match(evidence0084, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0084, /Canonical migration rows \| 84/);
+  assert.match(evidence0084, /Last version \| `0084`/);
+  assert.match(evidence0084, /Sequence mismatches \| 0/);
+  assert.match(evidence0084, /Non-partitioned targets left uncovered \| 0/);
+  assert.match(evidence0084, /Recommendation-event relations left uncovered \| 0/);
+  assert.match(evidence0084, /unindexed_foreign_keys/);
+  assert.match(evidence0084, /production[\s\S]{0,160}remains at migration\s+`0049`/i);
+});
+
+test('0085 reconciliation verifies exact RLS initialization migration identity', () => {
+  assert.match(repair0085, /where version = '0085'/i);
+  assert.match(repair0085, /rls_auth_initialization_plans/);
+  assert.match(repair0085, /ac1a27efc299f4e77fe7bc585ff9278a/);
+  assert.match(repair0085, /length\(array_to_string\(statements, E'\\n'\)\) = 11544/i);
+  assert.match(repair0085, /set version = '0085'/i);
+  assert.match(repair0085, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0085, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0085, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0085, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0085 evidence records canonical RLS optimization and no production change', () => {
+  assert.match(evidence0085, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0085, /Canonical migration rows \| 85/);
+  assert.match(evidence0085, /Last version \| `0085`/);
+  assert.match(evidence0085, /Sequence mismatches \| 0/);
+  assert.match(evidence0085, /Policies using initialized `auth\.uid\(\)` \| 36/);
+  assert.match(evidence0085, /Policies retaining direct `auth\.uid\(\)` \| 0/);
+  assert.match(evidence0085, /auth_rls_initplan/);
+  assert.match(evidence0085, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});
+
+test('0087 reconciliation verifies the exact private helper migration and changes metadata only', () => {
+  assert.match(repair0087, /where version = '0087'/i);
+  assert.match(repair0087, /private_policy_helper_boundary/);
+  assert.match(repair0087, /2a19735b6f615fd56d50745df38bdedb/);
+  assert.match(repair0087, /length\(array_to_string\(statements, E'\\n'\)\) = 11463/i);
+  assert.match(repair0087, /set version = '0087'/i);
+  assert.match(repair0087, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0087, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0087, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0087, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0087 evidence records the canonical private helper boundary and no production change', () => {
+  assert.match(evidence0087, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0087, /Canonical migration rows \| 87/);
+  assert.match(evidence0087, /Last version \| `0087`/);
+  assert.match(evidence0087, /Sequence mismatches \| 0/);
+  assert.match(evidence0087, /Target helpers remaining in `public` \| 0/);
+  assert.match(evidence0087, /Target `SECURITY DEFINER` helpers in `private` \| 6/);
+  assert.match(evidence0087, /Dependent policies explicitly using `private\.\*` \| 6/);
+  assert.match(evidence0087, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});
+
+test('0088 reconciliation verifies the exact authorization helper migration and changes metadata only', () => {
+  assert.match(repair0088, /where version = '0088'/i);
+  assert.match(repair0088, /private_authorization_helper_implementations/);
+  assert.match(repair0088, /2c4078e78456c67bd0b308674c2569ff/);
+  assert.match(repair0088, /length\(array_to_string\(statements, E'\\n'\)\) = 9200/i);
+  assert.match(repair0088, /set version = '0088'/i);
+  assert.match(repair0088, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0088, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0088, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0088, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0088 evidence records private authorization implementations and no production change', () => {
+  assert.match(evidence0088, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0088, /Canonical migration rows \| 88/);
+  assert.match(evidence0088, /Last version \| `0088`/);
+  assert.match(evidence0088, /Remaining generated versions \| 0/);
+  assert.match(evidence0088, /Private authorization definers \| 3/);
+  assert.match(evidence0088, /Public invoker compatibility wrappers \| 3/);
+  assert.match(evidence0088, /Active-user policy dependencies \| 27/);
+  assert.match(evidence0088, /Admin policy dependencies \| 75/);
+  assert.match(evidence0088, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});
+
+test('0089 reconciliation verifies the exact country helper migration and changes metadata only', () => {
+  assert.match(repair0089, /where version = '0089'/i);
+  assert.match(repair0089, /private_country_helper_implementations/);
+  assert.match(repair0089, /4eec3db83666d4d91087d5b8083a92f8/);
+  assert.match(repair0089, /length\(array_to_string\(statements, E'\\n'\)\) = 10477/i);
+  assert.match(repair0089, /set version = '0089'/i);
+  assert.match(repair0089, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0089, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0089, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0089, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0089 evidence records private country implementations and no production change', () => {
+  assert.match(evidence0089, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0089, /Canonical migration rows \| 89/);
+  assert.match(evidence0089, /Last version \| `0089`/);
+  assert.match(evidence0089, /Remaining generated versions \| 0/);
+  assert.match(evidence0089, /Private country definers \| 3/);
+  assert.match(evidence0089, /Public invoker compatibility wrappers \| 3/);
+  assert.match(evidence0089, /Preserved stored call paths \| 4/);
+  assert.match(evidence0089, /clearing six targeted warnings/i);
+  assert.match(evidence0089, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});
+
+test('0090 reconciliation verifies the exact seller profile privacy migration and changes metadata only', () => {
+  assert.match(repair0090, /where version = '0090'/i);
+  assert.match(repair0090, /seller_profile_identifier_privacy/);
+  assert.match(repair0090, /c90a4e5942969979fafe8ef7b02e812b/);
+  assert.match(repair0090, /length\(array_to_string\(statements, E'\\n'\)\) = 8212/i);
+  assert.match(repair0090, /set version = '0090'/i);
+  assert.match(repair0090, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0090, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0090, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0090, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0090 evidence records UUID seller profile privacy and no production change', () => {
+  assert.match(evidence0090, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0090, /Canonical migration rows \| 90/);
+  assert.match(evidence0090, /Last version \| `0090`/);
+  assert.match(evidence0090, /Remaining generated versions \| 0/);
+  assert.match(evidence0090, /Private UUID seller-profile definers \| 1/);
+  assert.match(evidence0090, /Public UUID invoker wrappers \| 1/);
+  assert.match(evidence0090, /Legacy email overloads \| 0/);
+  assert.match(evidence0090, /clearing two targeted warnings/i);
+  assert.match(evidence0090, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});
+
+test('0091 reconciliation verifies the exact Peek-summary migration and changes metadata only', () => {
+  assert.match(repair0091, /where version = '0091'/i);
+  assert.match(repair0091, /private_public_tour_summaries_implementation/);
+  assert.match(repair0091, /1ffbe7e117d538c27bb133acd67bd045/);
+  assert.match(repair0091, /length\(array_to_string\(statements, E'\\n'\)\) = 8676/i);
+  assert.match(repair0091, /set version = '0091'/i);
+  assert.match(repair0091, /source_version !~ '\^20260730\[0-9\]\{6\}\$'/i);
+  assert.doesNotMatch(repair0091, /\bcreate\s+(?:table|function|view|index|policy)\b/i);
+  assert.doesNotMatch(repair0091, /\balter\s+(?:table|function|view|extension|policy)\b/i);
+  assert.doesNotMatch(repair0091, /\bdrop\b|\btruncate\b|\bdelete\s+from\b/i);
+});
+
+test('0091 evidence records the private Peek-summary implementation and no production change', () => {
+  assert.match(evidence0091, /bwgklpxoetrrkutottdb/);
+  assert.match(evidence0091, /Canonical migration rows \| 91/);
+  assert.match(evidence0091, /Last version \| `0091`/);
+  assert.match(evidence0091, /Remaining generated versions \| 0/);
+  assert.match(evidence0091, /Private Peek-summary definers \| 1/);
+  assert.match(evidence0091, /Public Peek-summary invoker wrappers \| 1/);
+  assert.match(evidence0091, /Listing parent ceiling \| 100; 101 rejected with `22023`/);
+  assert.match(evidence0091, /Service parent ceiling \| 100; 101 rejected with `22023`/);
+  assert.match(evidence0091, /clearing[\s\S]{0,40}two targeted warnings/i);
+  assert.match(evidence0091, /production[\s\S]{0,180}remains at migration\s+`0049`/i);
+});

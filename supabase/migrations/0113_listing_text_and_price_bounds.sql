@@ -1,0 +1,56 @@
+-- 0113_listing_text_and_price_bounds.sql
+--
+-- Pass 6 B5: the database is the last line when application code is bypassed.
+--
+-- src/services/*Contracts.js bound listing and service text (title 160,
+-- description 5000) and reject absurd prices, but those run in the browser.
+-- A caller hitting PostgREST directly with their own key could store a
+-- 200,000-character title or a price of 10^30. Nothing at the database level
+-- stopped either: only `price >= 0` and `views >= 0` existed.
+--
+-- Limits match the existing client contracts so no legitimate write changes
+-- behaviour. Current maxima in staging are title 42 and description 408
+-- characters, so every existing row passes and the constraints are validated
+-- immediately rather than added NOT VALID.
+--
+-- char_length() counts characters, not bytes, so multi-byte text is measured
+-- the way a user perceives it and cannot be truncated mid-character.
+--
+-- Null bytes are not covered here because PostgreSQL cannot store U+0000 in a
+-- text column at all; it raises before any constraint runs. That is handled in
+-- src/lib/sanitizeText.js so the user sees a validation message rather than a
+-- server error.
+
+alter table public.listings
+  drop constraint if exists listings_title_length,
+  drop constraint if exists listings_description_length,
+  drop constraint if exists listings_seller_name_length,
+  drop constraint if exists listings_price_upper_bound;
+
+alter table public.listings
+  add constraint listings_title_length
+    check (char_length(btrim(title)) between 1 and 160),
+  add constraint listings_description_length
+    check (description is null or char_length(description) <= 5000),
+  add constraint listings_seller_name_length
+    check (seller_name is null or char_length(seller_name) <= 120),
+  -- Generous enough that no real property, vehicle or machine listing is
+  -- affected, low enough that a fuzzed or overflowed value is rejected.
+  add constraint listings_price_upper_bound
+    check (price is null or price < 1000000000000);
+
+alter table public.services
+  drop constraint if exists services_title_length,
+  drop constraint if exists services_description_length,
+  drop constraint if exists services_provider_name_length,
+  drop constraint if exists services_price_upper_bound;
+
+alter table public.services
+  add constraint services_title_length
+    check (char_length(btrim(title)) between 1 and 160),
+  add constraint services_description_length
+    check (description is null or char_length(description) <= 5000),
+  add constraint services_provider_name_length
+    check (provider_name is null or char_length(provider_name) <= 120),
+  add constraint services_price_upper_bound
+    check (price is null or price < 1000000000000);

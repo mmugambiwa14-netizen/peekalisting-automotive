@@ -1,0 +1,331 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronRight, ImageOff, MapPin, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CATEGORY_VISUALS } from './CategoryIcons';
+import { cn } from '@/lib/utils';
+import { loadMapLibre, mapTilerStyleUrl, registerOptionalStyleImageFallbacks } from '@/lib/mapProvider';
+import { searchPublicListingsPage } from '@/services/publicListingsService';
+import { getPublicServicesPage } from '@/services/servicesService';
+import { LAUNCH_COUNTRY_CODE, ZIMBABWE_MAP_CENTER } from '@/lib/marketConfig';
+import { MapCanvasSkeleton, MapPanelSkeleton } from '@/components/loading/LoadingSkeletons';
+import './discover-map-popup.css';
+
+const CATEGORY_KEYS = ['property', 'car', 'machinery', 'service'];
+const CITY_COORDS = {
+  harare: [-17.8216, 31.0492], bulawayo: [-20.1325, 28.6265], mutare: [-18.9707, 32.6709],
+  gweru: [-19.4515, 29.8169], masvingo: [-20.0744, 30.8326], chitungwiza: [-18.0127, 31.0756],
+};
+
+function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function coordinates(item) {
+  const latitude = number(item.coordinates?.latitude ?? item.latitude);
+  const longitude = number(item.coordinates?.longitude ?? item.longitude);
+  if (latitude !== null && longitude !== null) return { latitude, longitude, approximate: false };
+  const labels = [item.city, item.location_name, item.publicLocation, item.location_id].filter(Boolean).map((value) => String(value).toLowerCase());
+  for (const label of labels) {
+    const match = Object.entries(CITY_COORDS).find(([name]) => label.includes(name));
+    if (match) return { latitude: match[1][0], longitude: match[1][1], approximate: true };
+  }
+  return null;
+}
+function path(item) {
+  if (item._kind === 'service') return `/service/${item.id}`;
+  if (item._kind === 'car') return `/car/${item.id}`;
+  if (item._kind === 'machinery') return `/machinery/${item.id}`;
+  return `/property/${item.id}`;
+}
+function image(item) { return item.photos?.[0] || item.photo_urls?.[0] || item.cover_image_url || item.image_url || ''; }
+function place(item) { return item.publicLocation || item.location_name || item.city || 'Location available in listing'; }
+function price(item) {
+  if (item._kind === 'service' && (item.pricing_type === 'quote' || item.price == null)) return 'Contact for quote';
+  if (item.price == null) return 'Price on request';
+  return `${item.currency === 'USD' || !item.currency ? 'US$' : item.currency} ${Number(item.price).toLocaleString()}`;
+}
+
+function createCategoryMarker(item) {
+  const visual = CATEGORY_VISUALS[item._kind];
+  const Icon = visual.icon;
+  const element = document.createElement('button');
+  const pin = document.createElement('span');
+  const iconSlot = document.createElement('span');
+
+  element.type = 'button';
+  element.className = 'findit-map-marker';
+  element.dataset.category = item._kind;
+  element.dataset.selected = 'false';
+  element.style.setProperty('--marker-color', visual.color);
+  element.setAttribute('aria-label', `Preview ${visual.label.toLowerCase()}: ${item.title}`);
+  element.title = `${visual.label}: ${item.title}`;
+  pin.className = 'findit-map-marker-pin';
+  iconSlot.className = 'findit-map-marker-icon';
+  pin.append(iconSlot);
+  element.append(pin);
+
+  const iconRoot = createRoot(iconSlot);
+  iconRoot.render(<Icon className="h-6 w-6" />);
+  return { element, iconRoot };
+}
+
+function MapListingPreview({ item, point, onOpen, onClose }) {
+  const visual = CATEGORY_VISUALS[item._kind];
+  return (
+    <article className="findit-map-listing-preview" aria-label={`${item.title} preview`}>
+      <button type="button" onClick={onClose} aria-label="Close listing preview" className="findit-map-preview-close">
+        <X className="h-4 w-4" />
+      </button>
+      <button type="button" onClick={onOpen} className="block w-full text-left">
+        <div className="findit-map-preview-image">
+          {image(item) ? (
+            <img src={image(item)} alt="" loading="eager" decoding="async" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full items-center justify-center"><ImageOff className="h-6 w-6 text-muted-foreground" /></span>
+          )}
+          <span className="findit-map-preview-category">
+            <visual.icon className="h-5 w-5" />
+            {visual.label}
+          </span>
+        </div>
+        <div className="p-3">
+          <p className="text-base font-extrabold text-primary">{price(item)}</p>
+          <h2 className="mt-0.5 line-clamp-1 text-sm font-bold text-foreground">{item.title}</h2>
+          <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{place(item)}</p>
+          {point.approximate && <p className="mt-1 text-[11px] text-amber-700">Approximate city location</p>}
+          <span className="mt-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-primary text-xs font-bold text-primary-foreground">
+            {item._kind === 'service' ? 'View service' : 'View listing'} <ChevronRight className="h-4 w-4" />
+          </span>
+        </div>
+      </button>
+    </article>
+  );
+}
+
+function tuneDarkBasemap(map) {
+  const layers = map.getStyle()?.layers || [];
+  layers.forEach((layer) => {
+    try {
+      if (layer.id === 'background') map.setPaintProperty(layer.id, 'background-color', '#071a2c');
+      if (layer.id === 'water') map.setPaintProperty(layer.id, 'fill-color', '#061d31');
+      if (layer.type === 'line' && /^(highway|boundary|waterway)/.test(layer.id)) {
+        map.setPaintProperty(layer.id, 'line-color', layer.id.includes('casing') ? '#15344b' : '#1e4a63');
+      }
+      if (layer.type === 'symbol' && layer.paint?.['text-color']) {
+        map.setPaintProperty(layer.id, 'text-color', '#9caabd');
+        if (layer.paint?.['text-halo-color']) map.setPaintProperty(layer.id, 'text-halo-color', '#071a2c');
+      }
+    } catch {
+      // Provider layers may reject runtime paint changes; the map remains usable.
+    }
+  });
+}
+
+function useItems(location) {
+  const locationId = location?.city || '';
+  const property = useQuery({ queryKey: ['discover-map', 'property', LAUNCH_COUNTRY_CODE, locationId], queryFn: () => searchPublicListingsPage({ kind: 'property', countryCode: LAUNCH_COUNTRY_CODE, locationId }), staleTime: 60000 });
+  const cars = useQuery({ queryKey: ['discover-map', 'car', LAUNCH_COUNTRY_CODE, locationId], queryFn: () => searchPublicListingsPage({ kind: 'car', countryCode: LAUNCH_COUNTRY_CODE, locationId }), staleTime: 60000 });
+  const machinery = useQuery({ queryKey: ['discover-map', 'machinery', LAUNCH_COUNTRY_CODE, locationId], queryFn: () => searchPublicListingsPage({ kind: 'machinery', countryCode: LAUNCH_COUNTRY_CODE, locationId }), staleTime: 60000 });
+  const services = useQuery({ queryKey: ['discover-map', 'service', LAUNCH_COUNTRY_CODE, locationId], queryFn: () => getPublicServicesPage({ locationId, limit: 24 }), staleTime: 60000 });
+  const items = useMemo(() => [
+    ...((property.data?.items || []).map((item) => ({ ...item, _kind: 'property' }))),
+    ...((cars.data?.items || []).map((item) => ({ ...item, _kind: 'car' }))),
+    ...((machinery.data?.items || []).map((item) => ({ ...item, _kind: 'machinery' }))),
+    ...((services.data?.items || []).map((item) => ({ ...item, _kind: 'service' }))),
+  ], [cars.data, machinery.data, property.data, services.data]);
+  return { items, loading: property.isLoading || cars.isLoading || machinery.isLoading || services.isLoading };
+}
+
+export default function DiscoverMapView({ location }) {
+  const navigate = useNavigate();
+  const mapNode = useRef(null);
+  const [category, setCategory] = useState('all');
+  const [failure, setFailure] = useState('');
+  const [mapReady, setMapReady] = useState(false);
+  const { items, loading } = useItems(location);
+  const mapped = useMemo(() => items.map((item) => ({ item, point: coordinates(item) })).filter((entry) => entry.point), [items]);
+  const visible = useMemo(() => category === 'all' ? mapped : mapped.filter(({ item }) => item._kind === category), [category, mapped]);
+
+  useEffect(() => {
+    if (!mapNode.current) return undefined;
+    let cancelled = false;
+    let map;
+    let activePopup;
+    let activePopupRoot;
+    let activeMarkerElement;
+    let closeTimer;
+    let mapResizeObserver;
+    const markers = [];
+    const markerIconRoots = [];
+    const hoverCapable = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+
+    const cancelClose = () => {
+      if (closeTimer) window.clearTimeout(closeTimer);
+      closeTimer = undefined;
+    };
+
+    const closePreview = () => {
+      cancelClose();
+      activeMarkerElement?.setAttribute('data-selected', 'false');
+      activeMarkerElement = undefined;
+      activePopupRoot?.unmount();
+      activePopupRoot = undefined;
+      activePopup?.remove();
+      activePopup = undefined;
+    };
+
+    const scheduleClose = () => {
+      cancelClose();
+      closeTimer = window.setTimeout(closePreview, 180);
+    };
+
+    const showPreview = (maplibregl, item, point, markerElement, persistent) => {
+      closePreview();
+      markerElement.dataset.selected = 'true';
+      activeMarkerElement = markerElement;
+
+      const popupNode = document.createElement('div');
+      activePopupRoot = createRoot(popupNode);
+      activePopupRoot.render(
+        <MapListingPreview
+          item={item}
+          point={point}
+          onOpen={() => navigate(path(item))}
+          onClose={closePreview}
+        />,
+      );
+
+      activePopup = new maplibregl.Popup({
+        anchor: 'bottom',
+        closeButton: false,
+        closeOnClick: false,
+        focusAfterOpen: false,
+        offset: 48,
+        maxWidth: 'none',
+        className: 'findit-listing-map-popup',
+      })
+        .setLngLat([point.longitude, point.latitude])
+        .setDOMContent(popupNode)
+        .addTo(map);
+
+      const popupElement = activePopup.getElement();
+      popupElement.addEventListener('mouseenter', cancelClose);
+      if (!persistent) popupElement.addEventListener('mouseleave', scheduleClose);
+    };
+
+    setFailure('');
+    setMapReady(false);
+    (async () => {
+      try {
+        const maplibregl = await loadMapLibre();
+        if (cancelled || !mapNode.current) return;
+        map = new maplibregl.Map({
+          container: mapNode.current,
+          style: mapTilerStyleUrl(),
+          center: ZIMBABWE_MAP_CENTER,
+          zoom: 5.5,
+          minZoom: 0,
+          renderWorldCopies: false,
+          dragRotate: false,
+          pitchWithRotate: false,
+          cooperativeGestures: false,
+          touchPitch: false,
+        });
+        if (typeof ResizeObserver !== 'undefined' && mapNode.current) {
+          mapResizeObserver = new ResizeObserver(() => {
+            if (!cancelled) map?.resize();
+          });
+          mapResizeObserver.observe(mapNode.current);
+        }
+        registerOptionalStyleImageFallbacks(map);
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        const bounds = new maplibregl.LngLatBounds();
+
+        visible.forEach(({ item, point }) => {
+          const { element, iconRoot } = createCategoryMarker(item);
+          const marker = new maplibregl.Marker({ element, anchor: 'bottom', subpixelPositioning: true })
+            .setLngLat([point.longitude, point.latitude])
+            .addTo(map);
+
+          if (hoverCapable) {
+            element.addEventListener('mouseenter', () => showPreview(maplibregl, item, point, element, false));
+            element.addEventListener('mouseleave', scheduleClose);
+          }
+          element.addEventListener('click', (event) => {
+            event.stopPropagation();
+            showPreview(maplibregl, item, point, element, true);
+          });
+          element.addEventListener('focus', () => showPreview(maplibregl, item, point, element, true));
+
+          markerIconRoots.push(iconRoot);
+          markers.push(marker);
+          bounds.extend([point.longitude, point.latitude]);
+        });
+
+        map.once('load', () => {
+          if (cancelled) return;
+          tuneDarkBasemap(map);
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, { animate: false, padding: { top: 190, right: 38, bottom: 65, left: 38 }, maxZoom: visible.length === 1 ? 14 : 11 });
+          }
+          setMapReady(true);
+        });
+        map.on('click', closePreview);
+        map.on('error', () => {
+          if (!cancelled) {
+            setMapReady(true);
+            setFailure('Map tiles are temporarily unavailable.');
+          }
+        });
+      } catch {
+        if (!cancelled) {
+          setMapReady(true);
+          setFailure('The map could not load. Switch back to list view to continue.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      closePreview();
+      markerIconRoots.forEach((root) => root.unmount());
+      markers.forEach((marker) => marker.remove());
+      mapResizeObserver?.disconnect();
+      map?.remove();
+    };
+  }, [navigate, visible]);
+
+  if (loading) return <MapPanelSkeleton />;
+  return (
+    <section className="space-y-3" aria-label="Discover marketplace map">
+      <div className="locked-map-panel relative min-h-[540px]">
+        <div ref={mapNode} className="findit-discover-map" />
+        {!mapReady && <MapCanvasSkeleton label="Loading Discover map" />}
+        {failure && <div className="absolute inset-x-3 top-3 z-20 rounded-xl border border-border bg-background/94 px-3 py-2 text-xs shadow-lg backdrop-blur-xl">{failure}</div>}
+        {!loading && !mapped.length && <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 rounded-xl border border-border bg-background/88 px-3 py-2 text-center text-xs text-muted-foreground shadow-lg backdrop-blur-xl">No listings with public coordinates yet. The map is centered on Zimbabwe.</div>}
+      </div>
+
+      <div className="discover-map-rail surface-panel grid grid-cols-4 gap-1.5 p-2.5" role="group" aria-label="Filter map categories">
+        {CATEGORY_KEYS.map((key) => {
+          const visual = CATEGORY_VISUALS[key];
+          const Icon = visual.icon;
+          const active = category === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setCategory(active ? 'all' : key)}
+              aria-pressed={active}
+              className={cn('group min-w-0 rounded-xl border border-transparent p-1 text-left text-muted-foreground transition-colors', active && 'border-primary/45 bg-primary/10 text-primary')}
+            >
+              <span className="relative block aspect-[1.35] overflow-hidden rounded-lg border border-white/10 bg-surface-secondary">
+                <img src={visual.image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover opacity-80 transition-transform duration-300 group-hover:scale-105" />
+                <span className="absolute left-1 top-1 flex h-8 w-8 items-center justify-center"><Icon className="h-8 w-8" /></span>
+              </span>
+              <span className="mt-1 block truncate px-0.5 text-[10px] font-medium">{visual.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

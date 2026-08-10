@@ -1,0 +1,167 @@
+name: Deploy canonical PeekaListing staging
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: peekalisting-canonical-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: cloudflare-staging
+      url: https://staging.peekalisting.com
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT: peekalisting-staging
+      CLOUDFLARE_STAGING_DOMAIN: staging.peekalisting.com
+      NODE_ENV: production
+      VITE_MODE: staging
+      VITE_DEPLOY_ENV: staging
+      VITE_BASE_PATH: /
+      VITE_PUBLIC_APP_ORIGIN: https://staging.peekalisting.com
+      VITE_PREVIEW_DEPLOYMENT: "false"
+      FINDIT_STAGING_ORIGIN: https://staging.peekalisting.com
+      FINDIT_EXPECTED_PROJECT_REF: bwgklpxoetrrkutottdb
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || vars.FINDIT_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || secrets.FINDIT_SUPABASE_ANON_KEY }}
+      VITE_AUTH_GOOGLE_ENABLED: "true"
+      VITE_AUTH_APPLE_ENABLED: "false"
+      VITE_FEATURE_CURATED_BUSINESS_MARKETPLACE: "true"
+      VITE_FEATURE_BUSINESS_PROFILES: "true"
+      VITE_FEATURE_MESSAGING: "true"
+      VITE_FEATURE_ESSENTIAL_NOTIFICATIONS: "true"
+      VITE_FEATURE_GOOGLE_OAUTH: "true"
+      VITE_FEATURE_MAPS: "true"
+      VITE_FEATURE_CURRENT_LOCATION: "true"
+      VITE_FEATURE_MANUAL_LOCATION: "true"
+      VITE_FEATURE_REPORTING: "true"
+      VITE_FEATURE_CURRENCY_CONVERSION: "false"
+      VITE_FEATURE_PHONE_VERIFICATION: "false"
+      VITE_FEATURE_INTERNATIONAL_LISTING: "false"
+      VITE_FEATURE_SERVICE_RADIUS: "false"
+      VITE_FEATURE_LISTING_EXPIRY: "false"
+      VITE_FEATURE_LISTING_FRESHNESS_REMINDERS: "false"
+      VITE_FEATURE_TOURS: "true"
+      VITE_FEATURE_TOURS_PREVIEW: "false"
+      VITE_FEATURE_PREVIEW_FIXTURES: "false"
+      VITE_PREVIEW_AUTH_BYPASS: "false"
+      VITE_FEATURE_PAYMENTS: "false"
+      VITE_FEATURE_SUBSCRIPTIONS: "false"
+      VITE_FEATURE_ESCROW: "false"
+      VITE_FEATURE_PREMIUM_LISTINGS: "false"
+      VITE_FEATURE_AI_MODERATION: "false"
+      VITE_FEATURE_AI_BAN_EVASION: "false"
+      VITE_FEATURE_AI_TICKET_TRIAGE: "false"
+      VITE_FEATURE_AI_SUPPORT_CHAT: "false"
+      VITE_FEATURE_SCHEDULED_REMINDERS: "false"
+      VITE_FEATURE_MARKETING_EMAILS: "false"
+      TOURS_BACKEND_ENABLED: "true"
+      FINDIT_TOURS_WORKERS_ENABLED: "true"
+      FINDIT_TOURS_RELEASE_ACCEPTED: "true"
+      FINDIT_TOUR_PROCESSOR_MODE: github-actions
+      FINDIT_TOUR_CLEANUP_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CLEANUP_WORKER_SECRET }}
+      FINDIT_TOUR_CACHE_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CACHE_WORKER_SECRET }}
+      FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET }}
+      FINDIT_ESSENTIAL_NOTIFICATIONS_WORKERS_ENABLED: "true"
+      FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET: ${{ secrets.FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET }}
+      FINDIT_RECOMMENDATION_WORKERS_ENABLED: "true"
+      FINDIT_RECOMMENDATION_WORKER_SECRET: ${{ secrets.FINDIT_RECOMMENDATION_WORKER_SECRET }}
+
+    steps:
+      - name: Check out exact main head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify canonical source and credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_ANON_KEY"
+          case "$VITE_SUPABASE_URL" in
+            *bwgklpxoetrrkutottdb*) ;;
+            *) echo "::error::Canonical staging is not bound to FindIt Staging Supabase"; exit 1 ;;
+          esac
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --ignore-scripts
+
+      - name: Validate staging environment
+        run: npm run validate:env
+
+      - name: Build canonical staging PWA
+        run: npm run build
+
+      - name: Verify Cloudflare security contracts
+        run: npm run verify:deployment-security
+
+      - name: Prepare staging Functions runtime
+        run: node ./scripts/prepare-pages-functions-runtime.mjs
+
+      - name: Stamp exact build identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > dist/current-build.txt <<EOF
+          product=PeekaListing
+          environment=staging
+          host=staging.peekalisting.com
+          branch=main
+          sha=$GITHUB_SHA
+          run_id=$GITHUB_RUN_ID
+          backend=bwgklpxoetrrkutottdb
+          EOF
+          cat > dist/staging-build.json <<EOF
+          {"product":"PeekaListing","environment":"staging","host":"staging.peekalisting.com","branch":"main","sha":"$GITHUB_SHA","run_id":"$GITHUB_RUN_ID","backend":"bwgklpxoetrrkutottdb"}
+          EOF
+          test -f dist/index.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+
+      - name: Deploy and verify staging.peekalisting.com
+        run: bash ./scripts/deploy-canonical-cloudflare-staging.sh
+
+      - name: Configure isolated staging metadata bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg url "${VITE_SUPABASE_URL}" \
+            --arg key "${VITE_SUPABASE_ANON_KEY}" \
+            '{deployment_configs:{preview:{env_vars:{DEPLOYMENT_ENV:{type:"plain_text",value:"staging-preview"},SUPABASE_URL:{type:"plain_text",value:$url},SUPABASE_PUBLISHABLE_KEY:{type:"secret_text",value:$key}}},production:{env_vars:{DEPLOYMENT_ENV:{type:"plain_text",value:"staging"},SUPABASE_URL:{type:"plain_text",value:$url},SUPABASE_PUBLISHABLE_KEY:{type:"secret_text",value:$key}}}}}')"
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data "${payload}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT}" \
+            | jq -e '.success == true' >/dev/null
+
+      - name: Verify hosted staging
+        run: npm run verify:cloudflare-staging

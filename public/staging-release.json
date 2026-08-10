@@ -1,0 +1,5 @@
+{
+  "release": "2026-08-05-staging-pwa-auto-update",
+  "sourceCommit": "4175274cb4c3e562f348abcffa94066e20374939",
+  "purpose": "Deploy staging service worker auto-activation so installed PWAs receive new builds immediately"
+}

@@ -1,0 +1,189 @@
+name: Release Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-certification:
+    name: Repository, build and PWA gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.x
+
+      - name: Install locked dependencies
+        id: install
+        run: npm ci --ignore-scripts
+
+      - name: Audit production dependency boundary
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run audit:production
+
+      - name: Verify repository hygiene
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:hygiene
+
+      - name: Verify source graph
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:source-graph
+
+      - name: Verify SQL migration boundary
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:sql-boundary
+
+      - name: Verify Base44 elimination
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:base44-elimination
+
+      - name: Lint application
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+
+      - name: Typecheck active release surface
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:active
+
+      - name: Typecheck Supabase Edge Functions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:edge-functions
+
+      - name: Run all contracts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:contracts
+
+      - name: Run Tours contracts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:tours-contracts
+
+      - name: Run product audit contracts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:product-audit
+
+      - name: Build production PWA
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+
+      - name: Compose final journey evidence
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: node ./scripts/certify-final-release.mjs
+
+      - name: Upload repository release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: repository-release-certification-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            dist/**
+            PROJECT_STATUS.md
+            PRODUCTION_READINESS_REPORT.md
+
+  clean-database-certification:
+    name: Clean database migration and pgTAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+
+      # Keep Release Certification on the exact same reviewed database proof
+      # boundary as Migration Gates. The raw historical `supabase test db`
+      # inventory contains superseded pre-remediation tests and is not the
+      # authoritative final-schema certification matrix.
+      - name: Run authoritative clean-database certification matrix
+        run: bash ./scripts/run-migration-database-certification.sh
+
+      - name: Capture database diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts/certification
+          npx --yes supabase@2.84.2 status -o env > artifacts/certification/local-supabase-status.txt || true
+
+      - name: Upload database evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clean-database-certification-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/certification/**
+
+  hosted-release-certification:
+    name: Hosted journeys and bounded scale
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - repository-certification
+      - clean-database-certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run hosted journey certification
+        run: node ./scripts/certify-final-release.mjs
+
+      - name: Run bounded hosted scale certification
+        run: node ./scripts/certify-release-scale.mjs
+
+      - name: Upload hosted release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hosted-release-certification-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/certification/**

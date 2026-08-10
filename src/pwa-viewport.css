@@ -1,0 +1,117 @@
+/* Installed-mobile viewport normalization.
+ *
+ * iOS standalone windows can report a stale 100dvh during launch, rotation,
+ * keyboard transitions and status-bar changes. documentBootstrap keeps
+ * --findit-viewport-height aligned to visualViewport.height; these rules use it
+ * as the final authority while retaining svh/dvh fallbacks elsewhere.
+ */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100svh;
+  min-height: var(--findit-viewport-height, 100dvh);
+}
+
+html,
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Keep iOS Safari and installed PWAs from auto-zooming the document when a
+ * user focuses a small form control. 16px is the platform threshold; this
+ * preserves normal pinch-to-zoom and therefore does not reduce accessibility.
+ * The intentional !important defeats page-level utility classes such as
+ * text-sm on controls that are otherwise visually sized by their shell. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.findit-screen {
+  min-height: 100svh;
+  min-height: var(--findit-viewport-height, 100dvh);
+}
+
+.findit-full-viewport {
+  height: 100svh;
+  height: var(--findit-viewport-height, 100dvh);
+  min-height: 0;
+}
+
+.findit-discover-safe-top {
+  padding-top: 1rem;
+}
+
+.findit-mobile-nav {
+  bottom: max(0.625rem, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(500px, calc(100% - 1.25rem));
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  padding-bottom: 0;
+}
+
+/* The nav floats over photos and video thumbnails, so translucent dark-on-dark
+ * styling is not enough. This keeps it unmistakably separate without becoming
+ * an opaque toolbar. */
+.findit-mobile-nav .clay-nav {
+  border-color: hsl(var(--primary) / 0.34);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.99), hsl(var(--surface-secondary) / 0.99)),
+    hsl(var(--card));
+  box-shadow:
+    0 0 0 1px hsl(var(--background) / 0.9),
+    inset 0 1px 0 hsl(0 0% 100% / 0.16),
+    0 -8px 28px hsl(var(--background) / 0.82),
+    0 18px 46px hsl(var(--clay-shadow-dark) / 0.42);
+  backdrop-filter: blur(30px) saturate(155%);
+  -webkit-backdrop-filter: blur(30px) saturate(155%);
+}
+
+@media (min-width: 640px) {
+  .findit-discover-safe-top {
+    padding-top: 1.5rem;
+  }
+}
+
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  html,
+  body,
+  #root {
+    height: var(--findit-viewport-height, 100dvh);
+    min-height: var(--findit-viewport-height, 100dvh);
+  }
+
+  body {
+    position: relative;
+    background-color: hsl(var(--background));
+    background-attachment: scroll;
+  }
+
+  .findit-screen {
+    min-height: var(--findit-viewport-height, 100dvh);
+  }
+
+  .findit-mobile-nav-clearance {
+    padding-bottom: calc(4.75rem + max(0.75rem, env(safe-area-inset-bottom)));
+  }
+}
+
+/* iOS standalone mode renders normal document content beneath the translucent
+ * status bar. Apply the physical inset once at the shared route shell instead
+ * of repeating it in individual page headers. Full-screen conversations keep
+ * their own safe-area-aware fixed header and are excluded in AppLayout. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (max-width: 767px) {
+    .findit-mobile-safe-top {
+      padding-top: max(env(safe-area-inset-top), 0px);
+    }
+  }
+}

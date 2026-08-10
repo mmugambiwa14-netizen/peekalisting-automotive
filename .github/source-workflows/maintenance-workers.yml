@@ -1,0 +1,233 @@
+name: Run marketplace maintenance workers
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+    - cron: "23 2 * * *"
+    - cron: "11 3 * * *"
+    - cron: "*/5 * * * *"
+    - cron: "37 * * * *"
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: findit-maintenance-workers
+  cancel-in-progress: false
+
+jobs:
+  media-cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process due media cleanup jobs
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_MEDIA_CLEANUP_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "${SUPABASE_URL}/functions/v1/media-lifecycle-cleanup"
+
+  listing-expiry:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Expire due listings
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_LISTING_EXPIRY_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "${SUPABASE_URL}/functions/v1/listing-expiry-worker"
+
+  recommendation-projection:
+    if: vars.FINDIT_RECOMMENDATION_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process bounded recommendation projection queue
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_RECOMMENDATION_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{"mode":"projection","projectionLimit":200,"projectionMaxAttempts":8}' \
+            "${SUPABASE_URL}/functions/v1/recommendation-maintenance"
+
+  recommendation-maintenance:
+    if: vars.FINDIT_RECOMMENDATION_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '11 3 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Maintain recommendation partitions, aggregates and retention
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_RECOMMENDATION_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{"mode":"maintenance","retentionLimit":5000}' \
+            "${SUPABASE_URL}/functions/v1/recommendation-maintenance"
+
+  tour-processing:
+    if: vars.FINDIT_TOURS_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging-tours
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --ignore-scripts
+
+      - name: Install media toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Verify media processor
+        run: |
+          ffmpeg -hide_banner -version
+          ffprobe -hide_banner -version
+
+      - name: Process due Peek videos
+        env:
+          FINDIT_SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          FINDIT_SUPABASE_SECRET_KEY: ${{ secrets.FINDIT_SUPABASE_SECRET_KEY }}
+          FINDIT_EXPECTED_PROJECT_REF: ${{ vars.FINDIT_EXPECTED_PROJECT_REF }}
+        run: npm run run:tours-processor -- --batch-size 5
+
+  tour-cleanup:
+    if: vars.FINDIT_TOURS_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '37 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging-tours
+    steps:
+      - name: Process due Tour media cleanup jobs
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CLEANUP_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{"batchSize":20}' \
+            "${SUPABASE_URL}/functions/v1/tour-lifecycle-cleanup"
+
+  tour-cache-invalidation:
+    if: vars.FINDIT_TOURS_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/10 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging-tours
+    steps:
+      - name: Process Tour cache invalidations
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CACHE_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{"batchSize":100}' \
+            "${SUPABASE_URL}/functions/v1/tour-cache-invalidation"
+
+  tour-observability:
+    if: vars.FINDIT_TOURS_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/10 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging-tours
+    steps:
+      - name: Evaluate Tour operational health
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "${SUPABASE_URL}/functions/v1/tour-observability-monitor"
+
+  essential-notification-fanout:
+    if: vars.FINDIT_ESSENTIAL_NOTIFICATIONS_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process bounded essential notification fan-out
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          WORKER_SECRET: ${{ secrets.FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header "Content-Type: application/json" \
+            --data '{"jobLimit":10,"recipientLimit":200}' \
+            "${SUPABASE_URL}/functions/v1/essential-notification-fanout"
+
+  transactional-email-dispatch:
+    if: vars.FINDIT_TRANSACTIONAL_EMAIL_WORKERS_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging-tours
+    steps:
+      - name: Drain queued essential email deliveries
+        env:
+          SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+          EMAIL_DISPATCH_TOKEN: ${{ secrets.FINDIT_EMAIL_DISPATCH_TOKEN }}
+        run: |
+          test -n "${EMAIL_DISPATCH_TOKEN}" || { echo "FINDIT_EMAIL_DISPATCH_TOKEN is not configured"; exit 1; }
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${EMAIL_DISPATCH_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"limit":25}' \
+            "${SUPABASE_URL}/functions/v1/transactional-email-dispatch"

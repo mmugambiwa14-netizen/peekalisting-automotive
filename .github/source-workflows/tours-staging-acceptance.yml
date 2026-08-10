@@ -1,0 +1,195 @@
+name: Tours staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      acceptance_note:
+        description: Human release note or change-ticket reference
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tours-staging-acceptance
+  cancel-in-progress: false
+
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: staging-tours
+    env:
+      NODE_ENV: production
+      FINDIT_ALLOW_HOSTED_SMOKE: staging
+      FINDIT_EXPECTED_PROJECT_REF: ${{ vars.FINDIT_EXPECTED_PROJECT_REF }}
+      FINDIT_SMOKE_ORIGIN: ${{ vars.FINDIT_SMOKE_ORIGIN }}
+      FINDIT_SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+      FINDIT_SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+      FINDIT_SUPABASE_SECRET_KEY: ${{ secrets.FINDIT_SUPABASE_SECRET_KEY }}
+      FINDIT_ALLOW_STAGING_ACTIVATION: staging
+      FINDIT_ALLOW_STAGING_FOUNDER_SESSION: staging
+      FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_OBSERVABILITY_WORKER_SECRET }}
+      VITE_SUPABASE_URL: ${{ vars.FINDIT_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.FINDIT_SUPABASE_ANON_KEY }}
+      VITE_FEATURE_BUSINESS_PROFILES: "true"
+      VITE_FEATURE_MESSAGING: "true"
+      VITE_FEATURE_ESSENTIAL_NOTIFICATIONS: "true"
+      VITE_AUTH_GOOGLE_ENABLED: "true"
+      VITE_FEATURE_GOOGLE_OAUTH: "true"
+      VITE_FEATURE_MAPS: "true"
+      VITE_MAPTILER_PUBLIC_KEY: ${{ secrets.FINDIT_MAPTILER_PUBLIC_KEY }}
+      VITE_MAPTILER_STYLE_ID: ${{ vars.FINDIT_MAPTILER_STYLE_ID }}
+      VITE_FEATURE_INTERNATIONAL_LISTING: "true"
+      VITE_FEATURE_MANUAL_LOCATION: "true"
+      VITE_FEATURE_CURRENT_LOCATION: "true"
+      VITE_FEATURE_CURRENCY_CONVERSION: "false"
+      VITE_FEATURE_PHONE_VERIFICATION: "false"
+      VITE_FEATURE_SERVICE_RADIUS: "false"
+      VITE_FEATURE_REPORTING: "true"
+      VITE_FEATURE_PAYMENTS: "false"
+      VITE_FEATURE_SUBSCRIPTIONS: "false"
+      VITE_FEATURE_ESCROW: "false"
+      VITE_FEATURE_PREMIUM_LISTINGS: "false"
+      VITE_FEATURE_AI_MODERATION: "false"
+      VITE_FEATURE_AI_BAN_EVASION: "false"
+      VITE_FEATURE_AI_TICKET_TRIAGE: "false"
+      VITE_FEATURE_AI_SUPPORT_CHAT: "false"
+      VITE_FEATURE_SCHEDULED_REMINDERS: "false"
+      VITE_FEATURE_MARKETING_EMAILS: "false"
+      VITE_FEATURE_LISTING_EXPIRY: "false"
+      VITE_FEATURE_LISTING_FRESHNESS_REMINDERS: "false"
+      VITE_FEATURE_PREVIEW_FIXTURES: "false"
+      VITE_PREVIEW_AUTH_BYPASS: "false"
+      VITE_FEATURE_TOURS: "true"
+      VITE_FEATURE_TOURS_PREVIEW: "false"
+      TOURS_BACKEND_ENABLED: "true"
+      FINDIT_TOURS_WORKERS_ENABLED: "true"
+      FINDIT_TOURS_RELEASE_ACCEPTED: "true"
+      FINDIT_TOUR_PROCESSOR_MODE: "github-actions"
+      FINDIT_TOUR_CLEANUP_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CLEANUP_WORKER_SECRET }}
+      FINDIT_TOUR_CACHE_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CACHE_WORKER_SECRET }}
+      FINDIT_ESSENTIAL_NOTIFICATIONS_WORKERS_ENABLED: "true"
+      FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET: ${{ secrets.FINDIT_NOTIFICATION_FANOUT_WORKER_SECRET }}
+      FINDIT_RECOMMENDATION_WORKERS_ENABLED: "true"
+      FINDIT_RECOMMENDATION_WORKER_SECRET: ${{ secrets.FINDIT_RECOMMENDATION_WORKER_SECRET }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Use Deno for Edge Function checks
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.x
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --ignore-scripts
+
+      - name: Install media toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Verify media processor
+        run: |
+          ffmpeg -hide_banner -version
+          ffprobe -hide_banner -version
+
+      - name: Create acceptance identity
+        shell: bash
+        run: echo "FINDIT_TOURS_ACCEPTANCE_ID=tour-acceptance-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Validate accepted release environment
+        run: npm run validate:env
+
+      - name: Verify repository hygiene
+        run: npm run verify:hygiene
+
+      - name: Verify SQL migration boundary
+        run: npm run verify:sql-boundary
+
+      - name: Typecheck Edge Functions
+        run: npm run typecheck:edge-functions
+
+      - name: Audit routed product surface
+        run: npm run audit:product-surface
+
+      - name: Run reproducible internal certification
+        run: npm run certify:internal
+
+      - name: Run hosted Tours lifecycle acceptance
+        run: |
+          npm run test:tours-upload-hosted
+          npm run test:tours-processing-hosted
+          npm run test:tours-seller-hosted
+          npm run test:tours-integration-hosted
+          npm run test:tours-discovery-hosted
+          npm run test:tours-moderation-hosted
+          npm run test:tours-scale-hosted
+
+      - name: Run hosted scale and observability acceptance
+        run: |
+          npm run test:search-scale-hosted
+          npm run test:messaging-scale-hosted
+          npm run test:notification-scale-hosted
+          npm run test:tours-observability-hosted
+
+      - name: Activate certified staging capabilities
+        run: npm run activate:staging-capabilities
+
+      - name: Write acceptance record
+        shell: bash
+        env:
+          ACCEPTANCE_NOTE: ${{ inputs.acceptance_note }}
+        run: |
+          mkdir -p artifacts
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const internal = JSON.parse(fs.readFileSync('artifacts/certification/internal-certification.json', 'utf8'));
+          const record = {
+            acceptanceId: process.env.FINDIT_TOURS_ACCEPTANCE_ID,
+            acceptedAt: new Date().toISOString(),
+            commit: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            actor: process.env.GITHUB_ACTOR,
+            environment: 'staging-tours',
+            note: process.env.ACCEPTANCE_NOTE,
+            result: 'passed',
+            internalCertification: internal.summary,
+            internalCertificationPackageLockSha256: internal.sourceBoundary.packageLockSha256,
+            internalCertificationDependencyInventorySha256: internal.sourceBoundary.dependencyInventorySha256,
+            gates: [
+              'locked install', 'environment validation', 'MapLibre and MapTiler configuration',
+              'deployment security', 'workflow pinning', 'source graph', 'repository hygiene',
+              'SQL boundary', 'product surface audit', 'contracts', 'lint', 'typechecks',
+              'production build', 'dependency audit', 'Tours upload', 'processing',
+              'seller workflow', 'listing integration', 'public catalogue', 'moderation',
+              'Tours scale', 'public search scale', 'messaging scale', 'notification scale',
+              'observability', 'Peek activation', 'all recommendation policy activation'
+            ]
+          };
+          fs.writeFileSync('artifacts/tours-staging-acceptance.json', JSON.stringify(record, null, 2) + '\n');
+          NODE
+
+      - name: Upload acceptance records
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ env.FINDIT_TOURS_ACCEPTANCE_ID }}
+          path: |
+            artifacts/tours-staging-acceptance.json
+            artifacts/certification/internal-certification.json
+            artifacts/certification/dependency-inventory.json
+          if-no-files-found: error
+          retention-days: 90

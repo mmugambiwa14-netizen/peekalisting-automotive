@@ -1,0 +1,160 @@
+name: Migration gates
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend and source contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_ANON_KEY: sb_publishable_ci_local_only_0000000000000000
+      VITE_FEATURE_BUSINESS_PROFILES: "true"
+      VITE_FEATURE_MESSAGING: "false"
+      VITE_FEATURE_ESSENTIAL_NOTIFICATIONS: "false"
+      VITE_FEATURE_MAPS: "false"
+      VITE_FEATURE_CURRENT_LOCATION: "false"
+      VITE_FEATURE_INTERNATIONAL_LISTING: "false"
+      VITE_FEATURE_CURRENCY_CONVERSION: "false"
+      VITE_FEATURE_PHONE_VERIFICATION: "false"
+      VITE_FEATURE_SERVICE_RADIUS: "false"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Normalize locked dependency metadata
+        run: node ./scripts/normalize-package-lock.mjs --write
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+
+      # denoland/setup-deno@v2 is pinned below to an immutable commit.
+      - name: Use Deno for Edge Function checks
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.x
+
+      - name: Install locked dependencies
+        id: install
+        run: npm ci --ignore-scripts
+
+      - name: Audit production dependencies
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run audit:production
+
+      - name: Validate browser environment
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run validate:env
+
+      - name: Verify deployment security boundary
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:deployment-security
+
+      - name: Verify SQL migration boundary
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:sql-boundary
+
+      - name: Verify immutable workflow actions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node ./scripts/verify-workflow-pinning.mjs
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+
+      - name: Typecheck migrated boundaries
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:migration
+
+      - name: Typecheck active V1 graph
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:active
+
+      - name: Typecheck Supabase Edge Functions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck:edge-functions
+
+      - name: Run source contracts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:contracts
+
+      - name: Verify Base44 elimination
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run verify:base44-elimination
+
+      - name: Build and scan generated output
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          NODE_ENV: production
+        run: npm run build
+
+  database:
+    name: Database reset, RLS and recommendation certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+
+      # The certification runner executes this complete pgTAP inventory after a
+      # clean database reset. Keeping the list here makes the reviewed boundary
+      # explicit while the shell runner remains the single execution entrypoint:
+      # v1_contact_support.sql
+      # v1_contextual_ecosystem_intelligence.sql
+      # v1_curated_business_marketplace.sql
+      # v1_essential_notifications.sql
+      # v1_extension_schema_security.sql
+      # v1_foreign_key_index_coverage.sql
+      # v1_private_authenticated_rpc_implementations.sql
+      # v1_private_authorization_helper_implementations.sql
+      # v1_private_country_helper_implementations.sql
+      # v1_private_marketplace_view_implementation.sql
+      # v1_private_notification_read_implementations.sql
+      # v1_private_personalization_preference_implementations.sql
+      # v1_private_policy_helper_boundary.sql
+      # v1_private_public_listing_search_implementation.sql
+      # v1_private_public_seller_profile_implementation.sql
+      # v1_private_public_tour_summaries_implementation.sql
+      # v1_private_recommendation_event_implementation.sql
+      # v1_private_recommended_service_event_implementation.sql
+      # v1_private_support_request_implementation.sql
+      # v1_public_business_profile_view_security.sql
+      # v1_recommendation_analytics.sql
+      # v1_recommendation_eligibility_geospatial.sql
+      # v1_recommendation_foreign_key_index_coverage.sql
+      # v1_recommendation_foundation.sql
+      # v1_recommendation_personalization.sql
+      # v1_recommendation_projection_queue.sql
+      # v1_recommendation_publication_boundary.sql
+      # v1_recommendation_related_services.sql
+      # v1_recommendation_scale.sql
+      # v1_recommendation_service_operations.sql
+      # v1_recommendation_services.sql
+      # v1_release_control_consistency.sql
+      # v1_rls_auth_initialization_plans.sql
+      # v1_rls_permissive_policy_consolidation.sql
+      # v1_security_advisor_baseline.sql
+      - name: Run clean-database certification matrix
+        run: bash ./scripts/run-migration-database-certification.sh

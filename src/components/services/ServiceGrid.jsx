@@ -1,0 +1,42 @@
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import ServiceCard from "./ServiceCard";
+import { Briefcase } from "lucide-react";
+import { useAuth } from '@/lib/AuthContext';
+import { getServiceFavouriteIds } from '@/services/serviceFavouritesService';
+import { CardGridSkeleton } from '@/components/loading/LoadingSkeletons';
+
+export default function ServiceGrid({ services, isLoading }) {
+  const { user } = useAuth();
+  const serviceIds = useMemo(() => (services || []).map((service) => service.id).filter(Boolean), [services]);
+  const savedQuery = useQuery({
+    queryKey: ['service-favourites', user?.id, serviceIds],
+    queryFn: () => getServiceFavouriteIds(user.id, serviceIds),
+    enabled: Boolean(user?.id && serviceIds.length),
+    staleTime: 60_000,
+  });
+  const savedIds = useMemo(() => new Set(savedQuery.data || []), [savedQuery.data]);
+  if (isLoading) {
+    return <CardGridSkeleton label="Loading services" />;
+  }
+
+  if (!services || services.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+          <Briefcase className="w-7 h-7 text-muted-foreground" />
+        </div>
+        <p className="font-medium">No services found</p>
+        <p className="text-sm text-muted-foreground">Try a different category or check back soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      {services.map((service) => (
+        <ServiceCard key={service.id} service={service} isSaved={savedIds.has(service.id)} />
+      ))}
+    </div>
+  );
+}
