@@ -19,7 +19,7 @@ test('public shell is automotive-first without deleting reusable dormant routes'
   assert.doesNotMatch(home, /DiscoverCategoryGrid/);
   assert.match(nav, /label: 'Sell'/);
   assert.doesNotMatch(nav, /label: 'Post'/);
-  assert.match(app, /path="\/post" element={<CreateListing \/>}/);
+  assert.ok(app.includes('path="/post" element={<CreateListing />}'));
   assert.doesNotMatch(app, /BusinessPublishingGate><CreateListing/);
   assert.match(app, /path="\/property\/:id"/);
   assert.match(app, /path="\/machinery\/:id"/);
@@ -73,6 +73,7 @@ test('vehicle discovery exposes globally useful independent facets', async () =>
   assert.match(migration, /attributes -> 'values' ->> 'import_status'/);
   assert.match(migration, /listing_tour_slots/);
   assert.match(migration, /p_max_mileage/);
+  assert.match(migration, /kind = 'car'::public\.listing_kind/);
 });
 
 test('automotive Peek prompts ask for observable evidence instead of generic video', async () => {
