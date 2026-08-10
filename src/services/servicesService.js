@@ -173,6 +173,10 @@ export async function getPublicService(id) {
   return withTaxonomy;
 }
 
+/**
+ * @param {string[]} ids
+ * @param {{ signal?: AbortSignal }} [options]
+ */
 export async function getPublicServicesByIds(ids, { signal } = {}) {
   const uniqueIds = [...new Set(ids)].slice(0, 24);
   const rows = await findPublicServicesByIds(uniqueIds, { signal });
