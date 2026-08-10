@@ -101,17 +101,31 @@ test('normalizes and bounds a currency-scoped public search contract', () => {
   assert.equal(request.minBedrooms, 3);
 });
 
-test('all-currency browsing has no implicit price bounds', () => {
+test('all-currency automotive browsing defaults to Cars with no implicit price bounds', () => {
   const request = normalizePublicSearchRequest({ kind: 'dealer' });
   const explicitNull = normalizePublicSearchRequest({ kind: 'car', maxPrice: null });
 
-  assert.equal(request.kind, 'property');
+  assert.equal(request.kind, 'car');
   assert.equal(request.countryCode, 'ZW');
   assert.equal(request.currency, '');
   assert.equal(request.minPrice, null);
   assert.equal(request.maxPrice, null);
   assert.equal(request.cursor, null);
   assert.equal(explicitNull.maxPrice, null);
+});
+
+test('normalizes automotive model and seller-type facets without accepting invented seller states', () => {
+  const dealer = normalizePublicSearchPageRequest({
+    kind: 'car',
+    model: `  ${'Hilux '.repeat(20)}  `,
+    sellerType: 'DEALER',
+  });
+  const invalid = normalizePublicSearchPageRequest({ kind: 'car', sellerType: 'verified_private' });
+
+  assert.equal(dealer.model.length, 80);
+  assert.match(dealer.model, /^Hilux/);
+  assert.equal(dealer.sellerType, 'dealer');
+  assert.equal(invalid.sellerType, '');
 });
 
 test('price sorting is rejected until one supported listing currency is selected', () => {
