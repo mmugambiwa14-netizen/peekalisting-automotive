@@ -13,7 +13,7 @@ const [layout, topNavigation, bottomNavigation, bell, notificationCenter] = awai
 test('the active application shell exposes navigation landmarks and a keyboard skip link', () => {
   assert.match(layout, /href="#main-content"/);
   assert.match(layout, /id="main-content"/);
-  assert.match(topNavigation, /aria-label="Primary navigation"/);
+  assert.match(topNavigation, /aria-label="Automotive marketplace navigation"/);
   assert.match(bottomNavigation, /aria-label="Mobile navigation"/);
   assert.match(bottomNavigation, /aria-current=/);
 });
