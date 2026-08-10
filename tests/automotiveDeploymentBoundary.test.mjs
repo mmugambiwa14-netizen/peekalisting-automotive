@@ -12,8 +12,8 @@ test('automotive staging deploys only to its isolated Cloudflare and Supabase bo
   assert.match(workflow, /peekalisting-automotive-staging/);
   assert.match(workflow, /cars-staging\.peekalisting\.com/);
   assert.match(workflow, /PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF/);
-  assert.match(workflow, new RegExp(`!= \\"${OLD_FINDIT_STAGING_REF}\\"`));
-  assert.match(workflow, new RegExp(`!= \\"${FINDIT_MARKETPLACE_REF}\\"`));
+  assert.ok(workflow.includes(`!= "${OLD_FINDIT_STAGING_REF}"`));
+  assert.ok(workflow.includes(`!= "${FINDIT_MARKETPLACE_REF}"`));
   assert.match(workflow, /workflow_dispatch/);
   assert.doesNotMatch(workflow, /branches:\s*\n\s*- main/);
 });
