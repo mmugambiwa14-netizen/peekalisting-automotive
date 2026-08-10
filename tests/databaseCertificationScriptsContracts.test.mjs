@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 const [migration, recommendation, migrationWorkflow, recommendationWorkflow] = await Promise.all([
   readFile(new URL('../scripts/run-migration-database-certification.sh', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/run-recommendation-database-certification.sh', import.meta.url), 'utf8'),
-  readFile(new URL('../.github/workflows/migration-gates.yml', import.meta.url), 'utf8'),
-  readFile(new URL('../.github/workflows/recommendation-database-gates.yml', import.meta.url), 'utf8'),
+  readFile(new URL('../.github/source-workflows/migration-gates.yml', import.meta.url), 'utf8'),
+  readFile(new URL('../.github/source-workflows/recommendation-database-gates.yml', import.meta.url), 'utf8'),
 ]);
 
 function suiteCount(source) {
