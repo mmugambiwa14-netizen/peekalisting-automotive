@@ -5,15 +5,17 @@ import test from 'node:test';
 const workflow = readFileSync('.github/workflows/automotive-staging.yml', 'utf8');
 const verifier = readFileSync('scripts/verify-automotive-staging.mjs', 'utf8');
 
+const AUTOMOTIVE_STAGING_REF = 'epllatutrwbxnmsikkuc';
 const OLD_FINDIT_STAGING_REF = 'bwgklpxoetrrkutottdb';
 const FINDIT_MARKETPLACE_REF = 'jvbpxnfxkptuexgssplj';
 
 test('automotive staging deploys only to its isolated Cloudflare and Supabase boundary', () => {
   assert.match(workflow, /peekalisting-automotive-staging/);
   assert.match(workflow, /cars-staging\.peekalisting\.com/);
-  assert.match(workflow, /PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF/);
-  assert.ok(workflow.includes(`!= "${OLD_FINDIT_STAGING_REF}"`));
-  assert.ok(workflow.includes(`!= "${FINDIT_MARKETPLACE_REF}"`));
+  assert.ok(workflow.includes(`PEEKALISTING_EXPECTED_PROJECT_REF: ${AUTOMOTIVE_STAGING_REF}`));
+  assert.ok(workflow.includes(`VITE_SUPABASE_URL: https://${AUTOMOTIVE_STAGING_REF}.supabase.co`));
+  assert.ok(workflow.includes(`!= \"${OLD_FINDIT_STAGING_REF}\"`));
+  assert.ok(workflow.includes(`!= \"${FINDIT_MARKETPLACE_REF}\"`));
   assert.match(workflow, /workflow_dispatch/);
   assert.doesNotMatch(workflow, /branches:\s*\n\s*- main/);
 });
