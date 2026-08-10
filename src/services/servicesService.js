@@ -32,25 +32,13 @@ import { LAUNCH_COUNTRY_CODE } from '@/lib/marketConfig';
 function serviceTaxonomyTermMatches(node, value) {
   if (!node || typeof value !== 'string') return false;
   const normalized = value.trim().toLowerCase();
-  return node.stableSlug === normalized
-    || node.canonicalSlug === normalized
-    || node.aliases.includes(normalized);
+  return node.stableSlug === normalized || node.canonicalSlug === normalized || node.aliases.includes(normalized);
 }
 
 function serviceDomainNodes(taxonomy) {
-  const root = taxonomy.find((node) => (
-    node.marketplaceKind === 'service'
-    && node.depth === 0
-    && node.nodeType === 'group'
-    && !node.supersededBy
-  ));
+  const root = taxonomy.find((node) => node.marketplaceKind === 'service' && node.depth === 0 && node.nodeType === 'group' && !node.supersededBy);
   if (!root) return [];
-  return taxonomy.filter((node) => (
-    node.parentId === root.id
-    && node.nodeType === 'group'
-    && !node.supersededBy
-    && node.schemaBinding?.defaults?.service_domain === node.stableSlug
-  ));
+  return taxonomy.filter((node) => node.parentId === root.id && node.nodeType === 'group' && !node.supersededBy && node.schemaBinding?.defaults?.service_domain === node.stableSlug);
 }
 
 function serviceSpecializationNodes(taxonomy, domain) {
@@ -69,38 +57,24 @@ function serviceSpecializationNodes(taxonomy, domain) {
 
 function serviceMarketCountry(inputCountryCode) {
   const countryCode = String(inputCountryCode || LAUNCH_COUNTRY_CODE).trim().toUpperCase();
-  if (countryCode !== LAUNCH_COUNTRY_CODE) {
-    throw new TypeError('Service publishing is not enabled for this market');
-  }
+  if (countryCode !== LAUNCH_COUNTRY_CODE) throw new TypeError('Service publishing is not enabled for this market');
   return countryCode;
 }
 
 function humanizeTaxonomyKey(value) {
-  return String(value || '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 async function attachServiceTaxonomyPresentation(services, countryCode = LAUNCH_COUNTRY_CODE) {
   if (!Array.isArray(services) || services.length === 0) return services;
   let taxonomy = [];
-  try {
-    taxonomy = await getCategoryTaxonomy('service', countryCode);
-  } catch {
-    // Service data remains usable if reference-data presentation is temporarily
-    // unavailable. The fallback derives only from the stored stable key; it is
-    // not a competing category registry.
-  }
+  try { taxonomy = await getCategoryTaxonomy('service', countryCode); } catch { /* stable-key fallback remains usable */ }
   const byStableSlug = new Map(taxonomy.map((node) => [node.stableSlug, node]));
   return services.map((service) => {
     if (!service) return service;
     const categoryNode = byStableSlug.get(service.category);
-    const subcategoryKeys = Array.isArray(service.subcategories) && service.subcategories.length
-      ? service.subcategories
-      : (service.subcategory ? [service.subcategory] : []);
-    const subcategoryLabels = subcategoryKeys.map((key) => (
-      byStableSlug.get(key)?.label || humanizeTaxonomyKey(key)
-    ));
+    const subcategoryKeys = Array.isArray(service.subcategories) && service.subcategories.length ? service.subcategories : (service.subcategory ? [service.subcategory] : []);
+    const subcategoryLabels = subcategoryKeys.map((key) => byStableSlug.get(key)?.label || humanizeTaxonomyKey(key));
     return {
       ...service,
       category_label: categoryNode?.label || humanizeTaxonomyKey(service.category) || 'Service',
@@ -132,15 +106,34 @@ async function resolveServiceTaxonomySelection({ countryCode, category, subcateg
 }
 
 async function normalizeCanonicalPublicServiceRequest(request = {}) {
-  if (!request.category || request.category === 'all') return normalizePublicServiceRequest(request);
+  if ((!request.category || request.category === 'all') && !request.specialization) return normalizePublicServiceRequest(request);
   const countryCode = serviceMarketCountry(request.countryCode);
   const taxonomy = await getCategoryTaxonomy('service', countryCode);
   const domains = serviceDomainNodes(taxonomy);
-  const domain = domains.find((node) => serviceTaxonomyTermMatches(node, request.category));
+
+  let domain = request.category && request.category !== 'all'
+    ? domains.find((node) => serviceTaxonomyTermMatches(node, request.category))
+    : null;
+
+  if (!domain && request.specialization) {
+    domain = domains.find((candidate) => serviceSpecializationNodes(taxonomy, candidate).some((node) => serviceTaxonomyTermMatches(node, request.specialization)));
+  }
   if (!domain) throw new TypeError('Service category is not active in the current taxonomy');
+
+  const specializations = serviceSpecializationNodes(taxonomy, domain);
+  let specialization = '';
+  if (request.specialization) {
+    const match = specializations.find((node) => serviceTaxonomyTermMatches(node, request.specialization));
+    if (!match) throw new TypeError('Service type is not active in the current taxonomy');
+    specialization = match.stableSlug;
+  }
+
   return normalizePublicServiceRequest(
-    { ...request, category: domain.stableSlug },
-    { allowedCategories: new Set(domains.map((node) => node.stableSlug)) },
+    { ...request, category: domain.stableSlug, specialization },
+    {
+      allowedCategories: new Set(domains.map((node) => node.stableSlug)),
+      allowedSpecializations: new Set(specializations.map((node) => node.stableSlug)),
+    },
   );
 }
 
@@ -165,10 +158,7 @@ export async function getPublicServicesPage(request = {}) {
   const normalized = await normalizeCanonicalPublicServiceRequest(request);
   const page = createKeysetPage(await findPublicServices(normalized), normalized.limit);
   const enriched = await enrichPublicServiceCards(page.items);
-  return {
-    items: await attachServiceTaxonomyPresentation(enriched),
-    nextCursor: page.nextCursor,
-  };
+  return { items: await attachServiceTaxonomyPresentation(enriched), nextCursor: page.nextCursor };
 }
 
 export async function getPublicServices(request = {}) {
@@ -183,10 +173,6 @@ export async function getPublicService(id) {
   return withTaxonomy;
 }
 
-/**
- * @param {string[]} ids
- * @param {{ signal?: AbortSignal }} [options]
- */
 export async function getPublicServicesByIds(ids, { signal } = {}) {
   const uniqueIds = [...new Set(ids)].slice(0, 24);
   const rows = await findPublicServicesByIds(uniqueIds, { signal });
@@ -200,10 +186,7 @@ export async function getOwnerServicesPage(providerId, request = {}) {
   const normalized = normalizeOwnerServicePageRequest(providerId, request);
   const page = createKeysetPage(await findOwnerServices(normalized), normalized.limit);
   const services = await Promise.all(page.items.map(mapService));
-  return {
-    items: await attachServiceTaxonomyPresentation(services),
-    nextCursor: page.nextCursor,
-  };
+  return { items: await attachServiceTaxonomyPresentation(services), nextCursor: page.nextCursor };
 }
 
 export async function getOwnerServices(providerId, limit = 30) {
@@ -212,32 +195,16 @@ export async function getOwnerServices(providerId, limit = 30) {
 
 export async function createService(input, provider, uploads = []) {
   const countryCode = serviceMarketCountry(input?.country_code);
-  const taxonomy = await resolveServiceTaxonomySelection({
-    countryCode,
-    category: input?.category,
-    subcategories: Array.isArray(input?.subcategories) ? input.subcategories : [],
-  });
-  const normalized = normalizeServiceCreate({
-    ...input,
-    category: taxonomy.category,
-    subcategories: taxonomy.subcategories,
-  }, provider, taxonomy);
+  const taxonomy = await resolveServiceTaxonomySelection({ countryCode, category: input?.category, subcategories: Array.isArray(input?.subcategories) ? input.subcategories : [] });
+  const normalized = normalizeServiceCreate({ ...input, category: taxonomy.category, subcategories: taxonomy.subcategories }, provider, taxonomy);
   const created = await insertOwnerService(normalized);
   try {
     for (const [displayOrder, upload] of uploads.entries()) {
-      await attachMarketplaceImage({
-        ...upload,
-        purpose: 'service_photo',
-        targetKind: 'service',
-        targetId: created.id,
-        displayOrder,
-      });
+      await attachMarketplaceImage({ ...upload, purpose: 'service_photo', targetKind: 'service', targetId: created.id, displayOrder });
     }
   } catch (error) {
     await deleteOwnerServiceRow(provider.id, created.id).catch(() => {});
-    await Promise.all(uploads.map((upload) => (
-      removeStagedMarketplaceImage(upload.path, 'service_photo').catch(() => {})
-    )));
+    await Promise.all(uploads.map((upload) => removeStagedMarketplaceImage(upload.path, 'service_photo').catch(() => {})));
     throw error;
   }
   const mapped = await mapService({ ...created, photos: uploads.map((upload) => upload.path) });
@@ -248,11 +215,7 @@ export async function createService(input, provider, uploads = []) {
 export async function updateService(providerId, id, input, mediaChange = null) {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedId = normalizeServiceId(id);
-  const updated = await updateOwnerServiceRow(
-    normalizedProviderId,
-    normalizedId,
-    normalizeServiceEdit(input),
-  );
+  const updated = await updateOwnerServiceRow(normalizedProviderId, normalizedId, normalizeServiceEdit(input));
   if (!mediaChange) {
     const mapped = await mapService(updated);
     const [presented] = await attachServiceTaxonomyPresentation([mapped]);
@@ -261,45 +224,27 @@ export async function updateService(providerId, id, input, mediaChange = null) {
 
   const uploads = Array.isArray(mediaChange.uploads) ? mediaChange.uploads : [];
   try {
-    const replacement = await replaceServiceMedia(
-      normalizedId,
-      mediaChange.keepPaths,
-      uploads,
-    );
+    const replacement = await replaceServiceMedia(normalizedId, mediaChange.keepPaths, uploads);
     const removedPaths = Array.isArray(replacement?.removedPaths) ? replacement.removedPaths : [];
-    await Promise.all(removedPaths.map((path) => (
-      removeStagedMarketplaceImage(path, 'service_photo').catch(() => {})
-    )));
+    await Promise.all(removedPaths.map((path) => removeStagedMarketplaceImage(path, 'service_photo').catch(() => {})));
     const mapped = await mapService({ ...updated, photos: replacement?.photos ?? [] });
     const [presented] = await attachServiceTaxonomyPresentation([mapped]);
     return presented;
   } catch (error) {
-    await Promise.all(uploads.map((upload) => (
-      removeStagedMarketplaceImage(upload.path, 'service_photo').catch(() => {})
-    )));
-    const partial = Object.assign(
-      new Error('Service details were saved, but image changes could not be applied. Reload and try the images again.'),
-      { cause: error, partial: true },
-    );
-    throw partial;
+    await Promise.all(uploads.map((upload) => removeStagedMarketplaceImage(upload.path, 'service_photo').catch(() => {})));
+    throw Object.assign(new Error('Service details were saved, but image changes could not be applied. Reload and try the images again.'), { cause: error, partial: true });
   }
 }
 
 export async function setServiceStatus(providerId, id, status) {
-  const mapped = await mapService(await updateOwnerServiceRow(
-    normalizeProviderId(providerId),
-    normalizeServiceId(id),
-    { status: normalizeServiceStatus(status) },
-  ));
+  const mapped = await mapService(await updateOwnerServiceRow(normalizeProviderId(providerId), normalizeServiceId(id), { status: normalizeServiceStatus(status) }));
   const [presented] = await attachServiceTaxonomyPresentation([mapped]);
   return presented;
 }
 
 export async function deleteService(providerId, id) {
   const deleted = await deleteOwnerServiceRow(normalizeProviderId(providerId), normalizeServiceId(id));
-  const paths = Array.isArray(deleted.photos)
-    ? deleted.photos.filter((value) => typeof value === 'string' && value.includes('/service_photo/staging/'))
-    : [];
+  const paths = Array.isArray(deleted.photos) ? deleted.photos.filter((value) => typeof value === 'string' && value.includes('/service_photo/staging/')) : [];
   await Promise.all(paths.map((path) => removeStagedMarketplaceImage(path, 'service_photo').catch(() => {})));
   return deleted;
 }
