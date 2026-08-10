@@ -98,7 +98,7 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(baseMigration, /attributes -> 'values' ->> 'body_type'/);
   assert.match(baseMigration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
   assert.match(v3Migration, /idx_car_details_automotive_model_trgm/);
-  assert.match(v3Migration, /model gin_trgm_ops/);
+  assert.match(v3Migration, /model extensions\.gin_trgm_ops/);
   assert.match(v3Migration, /normalized_model/);
   assert.match(v3Migration, /normalized_seller_type not in \('', 'dealer', 'private'\)/);
   assert.match(v3Migration, /profile\.business_type = 'car_dealership'/);
