@@ -21,13 +21,6 @@ test('browser and PWA metadata identify PeekaListing', async () => {
   assert.match(html, /peekalisting-binoculars\.svg/);
   assert.equal(manifest.name, 'PeekaListing Marketplace');
   assert.equal(manifest.short_name, 'PeekaListing');
-  // This previously required every manifest icon to be the binocular SVG, which
-  // was unsatisfiable alongside webAppManifest.test.mjs: browsers will not offer
-  // installation without PNG icons at 192 and 512 plus a maskable, so the two
-  // contracts contradicted each other. The intent here is brand ownership, not
-  // file format -- assert that install metadata carries PeekaListing assets and
-  // never the retired FindIt rasters, which is what actually matters and is
-  // strictly harder to pass than the old check.
   assert.ok(
     manifest.icons.every((icon) => icon.src.startsWith('/brand/peekalisting-')),
     'every manifest icon must be a PeekaListing asset',
@@ -90,11 +83,13 @@ test('service worker rotates PeekaListing caches and retires legacy caches', asy
   assert.match(worker, /name\.startsWith\('findit-'\)/);
 });
 
-test('live help content reflects verified businesses and automatic publication', async () => {
+test('live help content reflects automotive moderation and qualified business approval', async () => {
   const faq = await read('src/pages/FAQs.jsx');
-  assert.match(faq, /Does PeekaListing verify businesses/);
-  assert.match(faq, /Validated listings publish immediately/);
-  assert.match(faq, /Peeks publish automatically/);
+  assert.match(faq, /verify dealerships and automotive businesses/);
+  assert.match(faq, /New vehicle submissions are reviewed before they become publicly discoverable/);
+  assert.match(faq, /reporting by itself does not automatically remove the content/);
+  assert.match(faq, /not a mechanical inspection, ownership verification, or guarantee of condition/);
+  assert.doesNotMatch(faq, /Validated listings publish immediately/);
   assert.doesNotMatch(faq, /messaging has completed migration/);
   assert.doesNotMatch(faq, /FindIt/);
 });

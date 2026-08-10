@@ -7,23 +7,23 @@ import { goBackOrHome } from "@/lib/navigation";
 const FAQS = [
   {
     question: "How do I contact a seller?",
-    answer: "Open a published listing and use the available contact actions. You can call, use WhatsApp, email, or start a PeekaListing chat when the seller permits that channel."
+    answer: "Open a published vehicle and use the available contact actions. You can call, use WhatsApp, email, or start a PeekaListing chat when the seller permits that channel."
   },
   {
     question: "Is it free to create listings?",
-    answer: "Yes. PeekaListing is free to browse, contact, and post within reasonable anti-abuse limits. There are no premium packages or paid placement in this MVP."
+    answer: "Yes. PeekaListing is free to browse, contact, and submit a vehicle within reasonable anti-abuse limits. There are no premium packages or paid placement in this MVP."
   },
   {
-    question: "How long do listings stay active?",
-    answer: "Listings remain active until you pause, remove, mark unavailable, sell, or rent them. Routine expiry is not enabled for the MVP launch."
+    question: "How long do vehicle listings stay active?",
+    answer: "Published vehicles remain active until the seller pauses, removes, marks unavailable, or sells them. Routine expiry is not enabled for the MVP launch."
   },
   {
-    question: "Can I edit my listing after publishing?",
-    answer: "Yes. Go to My Listings from your profile, choose the listing, and edit its details or validated images. Valid edits remain live without a routine review queue."
+    question: "Can I edit my vehicle after publishing?",
+    answer: "Yes. Go to My Listings from your profile and choose the vehicle. Ordinary permitted detail edits keep the existing publication state, while changes that require renewed trust checks, such as replacing listing media, can return the vehicle to review before it is public again."
   },
   {
-    question: "How do I save listings for later?",
-    answer: "Select the heart on a listing or service card or detail page. Your saved items appear in Saved. Sign in so they remain available across visits."
+    question: "How do I save vehicles for later?",
+    answer: "Select the heart on a vehicle or automotive service card or detail page. Your saved items appear in Saved. Sign in so they remain available across visits."
   },
   {
     question: "Does PeekaListing process payments?",
@@ -31,35 +31,35 @@ const FAQS = [
   },
   {
     question: "How do I report suspicious content?",
-    answer: "Use Report on a listing, Peek, message, service, or seller surface, choose the closest reason, and provide useful details. Reports support post-publication safety action; PeekaListing does not promise emergency response."
+    answer: "Use Report on a vehicle, Peek, message, service, or seller surface, choose the closest reason, and provide useful details. A report is intake for review; reporting by itself does not automatically remove the content. PeekaListing does not promise emergency response."
   },
   {
-    question: "Does PeekaListing verify businesses?",
-    answer: "Eligible businesses can apply for category-specific verification. An approved business marker reflects the approved business category only; it is not a guarantee of every listing, seller claim, transaction, or item condition."
+    question: "Does PeekaListing verify dealerships and automotive businesses?",
+    answer: "Eligible businesses can apply for category-specific approval. A PeekaListing dealer appears in the dealer directory only while its dealership profile and Cars business approval are current. That status is not a guarantee of every vehicle, seller claim, transaction, or item condition."
   },
   {
-    question: "Are ordinary listings and Peeks manually approved?",
-    answer: "No. Validated listings publish immediately, and Peeks publish automatically after successful media processing. Reported content can later be suspended, removed, or restored through the safety process."
+    question: "Are vehicle listings and Peeks manually approved?",
+    answer: "New vehicle submissions are reviewed before they become publicly discoverable. Peeks use their separate media-processing and publication lifecycle. A published Peek is visual evidence tied to the listing, not a mechanical inspection, ownership verification, or guarantee of condition."
   },
   {
     question: "What notifications will I receive?",
-    answer: "PeekaListing sends important operational updates such as business decisions, Peek requests and results, messages, report outcomes, and account-status changes. Marketing alerts are not part of this MVP."
+    answer: "PeekaListing sends important operational updates such as listing decisions, business decisions, Peek requests and results, messages, report outcomes, and account-status changes. Marketing alerts are not part of this MVP."
   },
   {
-    question: "How do I delete my listing?",
-    answer: "Navigate to My Listings, select the listing, and choose delete. This action is permanent and cannot be undone."
+    question: "How do I delete my vehicle listing?",
+    answer: "Navigate to My Listings, select the vehicle, and choose delete. This action is permanent and cannot be undone."
   },
   {
-    question: "How do I search for specific items?",
-    answer: "Use the search bar on Discover. You can filter by category, location, price range, and category-specific details."
+    question: "How do I search for a specific vehicle?",
+    answer: "Use the search bar on Discover. You can narrow results by location, make, vehicle type, price, year, mileage, condition, fuel, transmission, body style, drivetrain, import status, and whether a current Peek is available."
   },
   {
     question: "Can I negotiate prices with sellers?",
-    answer: "Many listings are marked as negotiable. Contact the seller through an available channel to discuss pricing, and follow the safety guidance before meeting or paying."
+    answer: "Many vehicle listings are marked as negotiable. Contact the seller through an available channel to discuss pricing, and follow the safety guidance before meeting or paying."
   },
   {
-    question: "How do I stay safe when buying?",
-    answer: "Use Peeks when available, meet in public places, bring someone you trust, inspect items before paying, and never share sensitive financial credentials. Report suspicious activity promptly."
+    question: "How do I stay safe when buying a vehicle?",
+    answer: "Use Peeks when available, verify seller identity and ownership documents, arrange an independent mechanical inspection, meet in a safe place, inspect the vehicle before paying, and never share sensitive financial credentials. Report suspicious activity promptly."
   }
 ];
 
