@@ -101,6 +101,9 @@ export default function CarDetail() {
   const currentPeek = car.tour?.status === "ready" ? car.tour : null;
   const currentPeekFreshness = peekFreshness(currentPeek?.publishedAt);
   const accidentHistory = displayValue(car.accident_history);
+  const approvedDealer = car.seller_type === "dealer" && Boolean(car.dealer_profile_id);
+  const sellerDisplayName = approvedDealer ? (car.dealer_company_name || car.seller_name) : car.seller_name;
+  const sellerProfilePath = approvedDealer ? `/dealer/${encodeURIComponent(car.dealer_profile_id)}` : null;
 
   return (
     <div className="findit-screen pb-24">
@@ -188,8 +191,17 @@ export default function CarDetail() {
             <ListingLocation label={location} latitude={car.latitude} longitude={car.longitude} listingType="car" />
           </ListingTabSection>
 
-          <ListingTabSection id="seller" title="Seller">
-            <ListingSeller name={car.seller_name} sellerId={car.seller_id} joinedAt={car.seller_joined_at} activeListingCount={car.seller_active_listing_count} actions={<ContactButtons listing={car} type="car" placement="browse" />} />
+          <ListingTabSection id="seller" title={approvedDealer ? "Dealer" : "Seller"}>
+            <ListingSeller
+              name={sellerDisplayName}
+              sellerId={car.seller_id}
+              joinedAt={car.seller_joined_at}
+              activeListingCount={car.seller_active_listing_count}
+              profilePath={sellerProfilePath}
+              profileLabel={approvedDealer ? "View dealer inventory" : "View listings"}
+              roleLabel={approvedDealer ? "Dealer" : "Seller"}
+              actions={<ContactButtons listing={car} type="car" placement="browse" />}
+            />
           </ListingTabSection>
         </ListingDetailTabs>
       </main>
