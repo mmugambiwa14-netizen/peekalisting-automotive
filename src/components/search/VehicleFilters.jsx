@@ -1,5 +1,5 @@
 import { CAR_CATEGORIES, CAR_MAKES, CONDITIONS, FUEL_TYPES, TRANSMISSIONS } from '@/lib/constants';
-import { AUTOMOTIVE_BODY_TYPES, AUTOMOTIVE_DRIVETRAINS, AUTOMOTIVE_IMPORT_STATUSES } from '@/lib/automotiveConfig';
+import { AUTOMOTIVE_BODY_TYPES, AUTOMOTIVE_DRIVETRAINS, AUTOMOTIVE_IMPORT_STATUSES, AUTOMOTIVE_SELLER_TYPES } from '@/lib/automotiveConfig';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchFilterSelect from './SearchFilterSelect';
@@ -10,6 +10,8 @@ export default function VehicleFilters({
   category,
   categoryOptions = CAR_CATEGORIES,
   make,
+  model,
+  sellerType,
   condition,
   fuelType,
   transmission,
@@ -27,6 +29,11 @@ export default function VehicleFilters({
       <SearchFilterSelect label="Vehicle family" value={category} onChange={(value) => onUpdate('category', value)} options={categoryOptions} />
       <SearchFilterSelect label="Body style" value={bodyType} onChange={(value) => onUpdate('bodyType', value)} options={AUTOMOTIVE_BODY_TYPES} />
       <SearchFilterSelect label="Make" value={make} onChange={(value) => onUpdate('make', value)} options={makes} />
+      <div>
+        <Label htmlFor="vehicle-model" className="text-sm font-medium">Model</Label>
+        <Input id="vehicle-model" value={model} onChange={(event) => onUpdate('model', event.target.value)} maxLength={80} placeholder="e.g. Hilux, Fit, Ranger" className="mt-2" autoComplete="off" />
+      </div>
+      <SearchFilterSelect label="Seller" value={sellerType} onChange={(value) => onUpdate('sellerType', value)} options={AUTOMOTIVE_SELLER_TYPES} placeholder="Any seller" />
       <SearchFilterSelect label="Condition" value={condition} onChange={(value) => onUpdate('condition', value)} options={CONDITIONS} />
       <SearchFilterSelect label="Fuel / power" value={fuelType} onChange={(value) => onUpdate('fuelType', value)} options={FUEL_TYPES} />
       <SearchFilterSelect label="Transmission" value={transmission} onChange={(value) => onUpdate('transmission', value)} options={TRANSMISSIONS} />
