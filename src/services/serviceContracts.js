@@ -9,9 +9,7 @@ const SERVICE_STATUSES = new Set(['active', 'paused', 'unavailable']);
 const SUPPORTED_CURRENCIES = new Set(['USD', 'ZWL', 'ZAR']);
 
 function requireUuid(value, label) {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new TypeError(`${label} is invalid`);
-  }
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) throw new TypeError(`${label} is invalid`);
   return value;
 }
 
@@ -48,9 +46,7 @@ function contactEmail(value) {
 function price(value, pricingType) {
   if (['quote', 'quote_required', 'contact_for_price'].includes(pricingType)) return null;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1_000_000_000_000) {
-    throw new TypeError('Price is invalid');
-  }
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1_000_000_000_000) throw new TypeError('Price is invalid');
   return parsed;
 }
 
@@ -74,9 +70,7 @@ function contacts(input) {
 }
 
 function normalizeSubcategories(value, allowedSubcategories) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
-    throw new TypeError('At least one service type is required');
-  }
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) throw new TypeError('At least one service type is required');
   const allowed = requireAllowedSet(allowedSubcategories, 'Service type');
   const normalized = [...new Set(value.map((item) => taxonomySlug(item, 'Service type')))];
   if (normalized.some((item) => !allowed.has(item))) throw new TypeError('Service type is not active in the current taxonomy');
@@ -93,19 +87,25 @@ export function normalizeProviderId(value) {
 
 export function normalizePublicServiceRequest(input = {}, taxonomy = {}) {
   const rawQuery = text(input.query, 'Search query', 80);
-  const query = rawQuery
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}\s'&-]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const query = rawQuery.normalize('NFKC').replace(/[^\p{L}\p{N}\s'&-]/gu, ' ').replace(/\s+/g, ' ').trim();
   const category = input.category ?? 'all';
+  let normalizedCategory = 'all';
   if (category !== 'all') {
-    const normalizedCategory = taxonomySlug(category, 'Service category');
+    normalizedCategory = taxonomySlug(category, 'Service category');
     const allowed = requireAllowedSet(taxonomy.allowedCategories, 'Service category');
     if (!allowed.has(normalizedCategory)) throw new TypeError('Service category is not active in the current taxonomy');
   }
+
+  let specialization = '';
+  if (input.specialization) {
+    specialization = taxonomySlug(input.specialization, 'Service type');
+    const allowed = requireAllowedSet(taxonomy.allowedSpecializations, 'Service type');
+    if (!allowed.has(specialization)) throw new TypeError('Service type is not active in the current taxonomy');
+  }
+
   return {
-    category: category === 'all' ? 'all' : taxonomySlug(category, 'Service category'),
+    category: normalizedCategory,
+    specialization,
     query,
     locationId: optionalUuid(input.locationId, 'Location'),
     limit: normalizePageLimit(input.limit, { fallback: 24, maximum: 48 }),
@@ -147,10 +147,7 @@ export function normalizeServiceCreate(input, provider, taxonomy = {}) {
 }
 
 export function normalizeServiceEdit(input) {
-  const allowed = new Set([
-    'title', 'description', 'pricing_type', 'price', 'currency',
-    'contact_phone', 'contact_whatsapp', 'contact_email',
-  ]);
+  const allowed = new Set(['title', 'description', 'pricing_type', 'price', 'currency', 'contact_phone', 'contact_whatsapp', 'contact_email']);
   for (const key of Object.keys(input ?? {})) {
     if (!allowed.has(key)) throw new TypeError(`Service field is not editable: ${key}`);
   }
