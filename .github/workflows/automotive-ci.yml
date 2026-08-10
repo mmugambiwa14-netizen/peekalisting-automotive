@@ -80,8 +80,19 @@ jobs:
       - name: Verify SQL migration boundary
         run: npm run verify:sql-boundary
 
-      - name: Run contract tests
-        run: npm run test:contracts
+      - name: Run automotive contract tests
+        run: >-
+          node --test
+          ./tests/automotive*.test.mjs
+          ./tests/homeAutomotiveInventoryContracts.test.mjs
+          ./tests/publicAutomotiveSearchContracts.test.mjs
+          ./tests/publicLaunchScopeContracts.test.mjs
+          ./tests/shippingTransportSeparationContracts.test.mjs
+          ./tests/listingPublicationJourneyContracts.test.mjs
+          ./tests/publicSearchCancellationContracts.test.mjs
+          ./tests/publicSearchCardPayloadContracts.test.mjs
+          ./tests/publicListingsCancellationContracts.test.mjs
+          ./tests/tourMilestone4ListingIntegration.test.mjs
 
       - name: Lint application
         run: npm run lint
