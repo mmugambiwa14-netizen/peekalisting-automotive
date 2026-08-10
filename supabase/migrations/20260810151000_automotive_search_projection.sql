@@ -5,7 +5,7 @@ create index if not exists idx_car_details_automotive_search
 
 create index if not exists idx_listings_car_attribute_values
   on public.listings using gin ((attributes -> 'values'))
-  where kind::text = 'car';
+  where kind = 'car'::public.listing_kind;
 
 create or replace function private.public_listing_search_card_page_v2(
   p_kind text,
@@ -206,8 +206,8 @@ begin
       or (p_kind = 'car' and car.listing_id is not null
         and (coalesce(p_brand, '') = '' or car.brand = p_brand)
         and (coalesce(p_condition, '') = '' or car.condition = p_condition)
-        and (coalesce(p_fuel_type, '') = '' or car.fuel_type::text = p_fuel_type)
-        and (coalesce(p_transmission, '') = '' or car.transmission::text = p_transmission)
+        and (coalesce(p_fuel_type, '') = '' or car.fuel_type = p_fuel_type)
+        and (coalesce(p_transmission, '') = '' or car.transmission = p_transmission)
         and (coalesce(p_body_type, '') = '' or listing.attributes -> 'values' ->> 'body_type' = p_body_type)
         and (coalesce(p_drivetrain, '') = '' or listing.attributes -> 'values' ->> 'drivetrain' = p_drivetrain)
         and (coalesce(p_import_status, '') = '' or listing.attributes -> 'values' ->> 'import_status' = p_import_status)
@@ -216,7 +216,7 @@ begin
         and (p_max_mileage is null or car.mileage <= p_max_mileage))
       or (p_kind = 'machinery' and machinery.listing_id is not null
         and (coalesce(p_brand, '') = '' or machinery.brand = p_brand)
-        and (coalesce(p_condition, '') = '' or machinery.condition::text = p_condition))
+        and (coalesce(p_condition, '') = '' or machinery.condition = p_condition))
     )
     and (
       p_cursor_id is null
