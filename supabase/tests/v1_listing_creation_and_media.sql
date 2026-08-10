@@ -6,13 +6,10 @@ select extensions.no_plan();
 insert into auth.users (id, email, raw_user_meta_data, created_at, updated_at)
 values
   ('84000000-0000-4000-8000-000000000001', 'listing-owner@example.test', '{"full_name":"Listing Owner"}', now(), now()),
-  ('84000000-0000-4000-8000-000000000002', 'listing-stranger@example.test', '{"full_name":"Listing Stranger"}', now(), now());
+  ('84000000-0000-4000-8000-000000000002', 'listing-stranger@example.test', '{"full_name":"Listing Stranger"}', now(), now()),
+  ('84000000-0000-4000-8000-000000000003', 'listing-admin@example.test', '{"full_name":"Listing Admin"}', now(), now());
 
-insert into public.business_category_approvals (
-  user_id, category, status, reviewed_at
-) values (
-  '84000000-0000-4000-8000-000000000001', 'car', 'approved', now()
-);
+update public.users set role = 'admin' where id = '84000000-0000-4000-8000-000000000003';
 
 create temporary table listing_fixture (
   intent_id uuid,
@@ -62,7 +59,7 @@ select extensions.lives_ok(
       'path', (select storage_path from listing_fixture)
     ))
   )$$,
-  'an approved business can atomically create a validated listing'
+  'an active private seller can atomically submit a validated vehicle'
 );
 reset role;
 
@@ -74,8 +71,8 @@ set listing_id = (
 
 select extensions.is(
   (select status::text from public.listings where id = (select listing_id from listing_fixture)),
-  'available',
-  'validated listings publish immediately without human review'
+  'pending_review',
+  'validated automotive submissions remain pending until moderation'
 );
 select extensions.is(
   (select count(*)::bigint from public.car_details where listing_id = (select listing_id from listing_fixture)),
@@ -90,7 +87,32 @@ select extensions.is(
 select extensions.is(
   (select state from public.listing_upload_intents where id = (select intent_id from listing_fixture)),
   'attached',
-  'the media authorization is single-use after publication'
+  'the media authorization is single-use after submission'
+);
+
+select set_config('request.jwt.claim.sub', '', true);
+set local role anon;
+select extensions.is(
+  (select count(*)::bigint from public.listings where id = (select listing_id from listing_fixture)),
+  0::bigint,
+  'pending vehicle is not visible to anonymous visitors'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '84000000-0000-4000-8000-000000000003', true);
+set local role authenticated;
+select extensions.lives_ok(
+  $$select public.admin_moderate_marketplace_item(
+    (select listing_id from listing_fixture), 'car', 'publish', 'Validated automotive submission'
+  )$$,
+  'an administrator can approve a pending vehicle'
+);
+reset role;
+
+select extensions.is(
+  (select status::text from public.listings where id = (select listing_id from listing_fixture)),
+  'available',
+  'admin approval publishes the vehicle'
 );
 
 select set_config('request.jwt.claim.sub', '', true);
@@ -98,12 +120,12 @@ set local role anon;
 select extensions.is(
   (select count(*)::bigint from public.listings where id = (select listing_id from listing_fixture)),
   1::bigint,
-  'the published listing is immediately visible to anonymous visitors'
+  'approved vehicle is visible to anonymous visitors'
 );
 select extensions.is(
   (select count(*)::bigint from public.listing_media where listing_id = (select listing_id from listing_fixture)),
   1::bigint,
-  'published media metadata is visible through the public listing boundary'
+  'approved vehicle media metadata is visible through the public boundary'
 );
 reset role;
 
@@ -111,7 +133,7 @@ select set_config('request.jwt.claim.sub', '84000000-0000-4000-8000-000000000001
 set local role authenticated;
 select extensions.lives_ok(
   $$select public.owner_transition_listing((select listing_id from listing_fixture), 'pause')$$,
-  'the owner can pause a live listing'
+  'the owner can pause an approved live vehicle'
 );
 reset role;
 
@@ -120,7 +142,7 @@ set local role anon;
 select extensions.is(
   (select count(*)::bigint from public.listings where id = (select listing_id from listing_fixture)),
   0::bigint,
-  'paused listings disappear from public reads'
+  'paused vehicles disappear from public reads'
 );
 reset role;
 
@@ -128,13 +150,13 @@ select set_config('request.jwt.claim.sub', '84000000-0000-4000-8000-000000000001
 set local role authenticated;
 select extensions.lives_ok(
   $$select public.owner_transition_listing((select listing_id from listing_fixture), 'resume')$$,
-  'the owner can resume a paused listing immediately'
+  'the owner can resume a previously approved paused vehicle'
 );
 select extensions.lives_ok(
   $$update public.listings
     set title = 'Updated 2022 Toyota Hilux double cab'
     where id = (select listing_id from listing_fixture)$$,
-  'the owner can edit a live listing without creating a review queue'
+  'the owner can edit a live vehicle without changing managed publication state'
 );
 select extensions.is(
   (select status::text from public.listings where id = (select listing_id from listing_fixture)),
@@ -146,20 +168,30 @@ select extensions.throws_ok(
     where id = (select listing_id from listing_fixture)$$,
   '42501',
   'listing-managed fields require a trusted operation',
-  'owners still cannot bypass trusted state-transition operations'
+  'owners cannot bypass trusted state-transition operations'
 );
 select extensions.lives_ok(
   $$select public.owner_transition_listing((select listing_id from listing_fixture), 'unavailable')$$,
-  'the owner can end the listing'
+  'the owner can end the vehicle listing'
 );
 select extensions.lives_ok(
   $$select public.owner_transition_listing((select listing_id from listing_fixture), 'submit')$$,
-  'the owner can relist an unavailable listing without human review'
+  'the owner can resubmit an unavailable vehicle'
 );
 select extensions.is(
   (select status::text from public.listings where id = (select listing_id from listing_fixture)),
-  'available',
-  'relisting returns the validated listing directly to the marketplace'
+  'pending_review',
+  'automotive relisting returns to moderation instead of self-publication'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '84000000-0000-4000-8000-000000000003', true);
+set local role authenticated;
+select extensions.lives_ok(
+  $$select public.admin_moderate_marketplace_item(
+    (select listing_id from listing_fixture), 'car', 'publish', 'Approved relisted automotive advert'
+  )$$,
+  'administrator can approve the relisted vehicle'
 );
 reset role;
 
@@ -169,7 +201,7 @@ select extensions.throws_ok(
   $$select public.owner_transition_listing((select listing_id from listing_fixture), 'pause')$$,
   'P0002',
   'listing not found',
-  'another user cannot control the listing lifecycle'
+  'another user cannot control the vehicle lifecycle'
 );
 reset role;
 
@@ -177,7 +209,7 @@ select set_config('request.jwt.claim.sub', '84000000-0000-4000-8000-000000000001
 set local role authenticated;
 select extensions.lives_ok(
   $$delete from public.listings where id = (select listing_id from listing_fixture)$$,
-  'the owner can permanently delete their listing through the protected owner boundary'
+  'the owner can permanently delete their vehicle through the protected owner boundary'
 );
 reset role;
 
