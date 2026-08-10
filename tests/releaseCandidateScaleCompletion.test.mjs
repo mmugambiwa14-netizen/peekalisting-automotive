@@ -89,10 +89,12 @@ test('active Search page uses bounded infinite thin-card pages and no exact tota
   assert.match(searchPage, /useDebouncedValue/);
   assert.match(searchPage, /250/);
   assert.match(searchPage, /currency/);
+  assert.match(searchPage, /model/);
+  assert.match(searchPage, /sellerType/);
   assert.match(listingResults, /Load more/);
   assert.doesNotMatch(searchPage, /totalPages|setPage\(|pageSize\s*\*|count:\s*['"]exact['"]/);
   assert.doesNotMatch(listingResults, /total results|page \d|totalPages/i);
-  assert.match(searchRepository, /public_listing_search_card_page_v1/);
+  assert.match(searchRepository, /public_listing_search_card_page_v3/);
   assert.match(searchService, /values\.length > request\.pageSize/);
   assert.match(searchService, /nextCursor/);
 });
