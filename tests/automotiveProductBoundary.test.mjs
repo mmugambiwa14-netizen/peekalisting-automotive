@@ -48,10 +48,11 @@ test('launch taxonomy is narrower than the reusable vehicle ontology', async () 
 });
 
 test('private vehicle submission remains moderated and other domains remain curated', async () => {
-  const [service, originalCreation, launchMigration] = await Promise.all([
+  const [service, originalCreation, launchMigration, success] = await Promise.all([
     source('src/services/listingCreationService.js'),
     source('supabase/migrations/0021_v1_listing_creation_and_media.sql'),
     source('supabase/migrations/20260810150000_automotive_open_vehicle_submission.sql'),
+    source('src/components/create-listing/PublishSuccess.jsx'),
   ]);
 
   assert.match(service, /if \(input\.kind !== 'car'\)/);
@@ -60,6 +61,9 @@ test('private vehicle submission remains moderated and other domains remain cura
   assert.match(launchMigration, /account\.status = 'active'/);
   assert.match(launchMigration, /business_category_approvals/);
   assert.match(launchMigration, /pending_review/);
+  assert.match(success, /Vehicle submitted for review/);
+  assert.match(success, /Pending review/);
+  assert.doesNotMatch(success, />Your listing is live</);
 });
 
 test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
