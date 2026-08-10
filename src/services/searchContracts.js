@@ -4,6 +4,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const SEARCH_KINDS = new Set(['property', 'car', 'machinery']);
 const SEARCH_SORTS = new Set(['newest', 'price_asc', 'price_desc', 'most_viewed']);
 const SEARCH_CURRENCIES = new Set(['USD', 'ZWL', 'ZAR']);
+const AUTOMOTIVE_SELLER_TYPES = new Set(['dealer', 'private']);
 const PAGE_SIZE = 24;
 
 function text(value, maxLength = 100) {
@@ -40,6 +41,7 @@ function baseRequest(input = {}) {
   const minYear = boundedInteger(input.minYear, 1886, 2100);
   let maxYear = boundedInteger(input.maxYear, 1886, 2100);
   if (minYear !== null && maxYear !== null && maxYear < minYear) maxYear = minYear;
+  const requestedSellerType = text(input.sellerType, 20).toLowerCase();
 
   return {
     kind,
@@ -52,6 +54,8 @@ function baseRequest(input = {}) {
     maxPrice,
     minBedrooms: positiveInteger(input.minBedrooms),
     brand: text(input.brand, 80),
+    model: text(input.model, 80),
+    sellerType: AUTOMOTIVE_SELLER_TYPES.has(requestedSellerType) ? requestedSellerType : '',
     condition: text(input.condition, 40),
     fuelType: text(input.fuelType, 40),
     transmission: text(input.transmission, 40),

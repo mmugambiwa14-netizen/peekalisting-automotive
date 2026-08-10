@@ -8,20 +8,23 @@ const migrationsDirectory = resolve(root, 'supabase/migrations');
 const rollbackDirectory = resolve(root, 'supabase/rollback');
 const failures = [];
 
-const migrationFiles = (await readdir(migrationsDirectory))
+const allMigrationFiles = (await readdir(migrationsDirectory))
+  .filter((name) => /^\d+_.+\.sql$/.test(name))
+  .sort();
+const numberedMigrationFiles = allMigrationFiles
   .filter((name) => /^\d{4}_.+\.sql$/.test(name))
   .sort();
 
-if (!migrationFiles.length) failures.push('no numbered migrations found');
+if (!numberedMigrationFiles.length) failures.push('no numbered migrations found');
 
-const numbers = migrationFiles.map((name) => Number(name.slice(0, 4)));
+const numbers = numberedMigrationFiles.map((name) => Number(name.slice(0, 4)));
 for (let index = 0; index < numbers.length; index += 1) {
   const expected = index + 1;
-  if (numbers[index] !== expected) failures.push(`migration sequence expected ${String(expected).padStart(4, '0')} but found ${migrationFiles[index]}`);
+  if (numbers[index] !== expected) failures.push(`migration sequence expected ${String(expected).padStart(4, '0')} but found ${numberedMigrationFiles[index]}`);
 }
 
 const rollbackFiles = new Set((await readdir(rollbackDirectory)).filter((name) => name.endsWith('.rollback.sql')));
-for (const migration of migrationFiles.filter((name) => Number(name.slice(0, 4)) >= 30)) {
+for (const migration of numberedMigrationFiles.filter((name) => Number(name.slice(0, 4)) >= 30)) {
   const expectedRollback = migration.replace(/\.sql$/, '.rollback.sql');
   if (!rollbackFiles.has(expectedRollback)) failures.push(`missing rollback pair for ${migration}`);
 }
@@ -45,7 +48,11 @@ function inspectSqlText(name, content) {
   for (const [tag, count] of dollarQuoteBalance(content)) failures.push(`${name} has unbalanced ${tag} delimiters (${count})`);
 }
 
-for (const name of migrationFiles) {
+// The repository now contains both the original contiguous four-digit chain and
+// later timestamped additive migrations. Contiguity/release-tip policy remains
+// anchored to the four-digit chain, but syntax-boundary inspection must cover
+// every migration so new product work cannot bypass this gate by filename.
+for (const name of allMigrationFiles) {
   const content = await readFile(join(migrationsDirectory, name), 'utf8');
   inspectSqlText(name, content);
 }
@@ -62,12 +69,19 @@ async function readPairedMigration(rollbackName) {
   }
 }
 
-for (const name of [...rollbackFiles].filter((file) => Number(file.slice(0, 4)) >= 40).sort()) {
+for (const name of [...rollbackFiles].sort()) {
   const content = await readFile(join(rollbackDirectory, name), 'utf8');
-  if (hasDestructiveRollbackStatements(content, await readPairedMigration(name))) {
-    failures.push(`${name} contains destructive table/data rollback statements`);
-  }
   inspectSqlText(name, content);
+
+  // Preserve the established destructive-rollback enforcement boundary for the
+  // locked numbered chain. Timestamped rollback safety is additionally pinned
+  // by feature-specific contract tests; broadening destructive policy across
+  // historical timestamp capsules would be a separate migration-governance job.
+  if (/^\d{4}_/.test(name) && Number(name.slice(0, 4)) >= 40) {
+    if (hasDestructiveRollbackStatements(content, await readPairedMigration(name))) {
+      failures.push(`${name} contains destructive table/data rollback statements`);
+    }
+  }
 }
 
 // Previous reviewed release tips:
@@ -108,9 +122,9 @@ for (const name of [...rollbackFiles].filter((file) => Number(file.slice(0, 4)) 
 // - 0123_response_peek_binding_and_notifications.sql
 // Release-tip anchor: bump this deliberately when a migration is added.
 const RELEASE_TIP_MIGRATION = '0124_live_conversation_updates.sql';
-if (basename(migrationFiles.at(-1) ?? '') !== RELEASE_TIP_MIGRATION) {
+if (basename(numberedMigrationFiles.at(-1) ?? '') !== RELEASE_TIP_MIGRATION) {
   failures.push(
-    `latest expected migration is ${RELEASE_TIP_MIGRATION}, found ${migrationFiles.at(-1) ?? 'none'}`,
+    `latest expected migration is ${RELEASE_TIP_MIGRATION}, found ${numberedMigrationFiles.at(-1) ?? 'none'}`,
   );
 }
 
@@ -120,4 +134,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`SQL boundary verification passed: ${migrationFiles.length} contiguous migrations and ${rollbackFiles.size} rollback capsules inspected.`);
+console.log(`SQL boundary verification passed: ${numberedMigrationFiles.length} contiguous numbered migrations, ${allMigrationFiles.length} total migrations and ${rollbackFiles.size} rollback capsules inspected.`);

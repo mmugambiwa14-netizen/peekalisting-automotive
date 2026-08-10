@@ -53,9 +53,12 @@ $$;
 
 revoke all on function private.auto_publish_validated_mvp_listing() from public, anon, authenticated, service_role;
 
--- Keep the insert trigger as the authoritative publisher boundary. A browser
--- cannot bypass review by inserting a car directly with status=available or
--- status=draft: every non-admin automotive insert must enter pending_review.
+-- Keep the insert trigger as the authoritative publisher boundary. The mature
+-- listing transaction predates automotive moderation and can still present a
+-- validated row as `available`. Vehicle submissions must enter review before
+-- publication, so every non-admin Cars insert is normalized to pending_review
+-- here. Authenticated browser roles still have no direct INSERT grant on the
+-- listings table; this trigger also fails safe if that grant boundary ever drifts.
 create or replace function public.enforce_curated_listing_publisher()
 returns trigger
 language plpgsql
@@ -88,10 +91,10 @@ begin
       raise exception 'Active seller account required' using errcode = '42501';
     end if;
 
-    if new.status <> 'pending_review'::public.listing_status then
-      raise exception 'Vehicle submissions must enter review before publication'
-        using errcode = '42501';
-    end if;
+    new.status := 'pending_review'::public.listing_status;
+    new.moderation_reason := null;
+    new.expires_at := null;
+    new.expiry_notice_sent_at := null;
     return new;
   end if;
 
@@ -176,7 +179,7 @@ end;
 $$;
 
 comment on function public.enforce_curated_listing_publisher() is
-  'Automotive launch boundary: active users may submit cars only into pending review; dormant listing families retain business-category approval.';
+  'Automotive launch boundary: active users may submit Cars, and every non-admin Cars insert is normalized to pending review before publication; dormant listing families retain business-category approval.';
 comment on function private.auto_publish_validated_mvp_listing() is
   'Automotive specialization of the legacy auto-publication trigger: cars remain pending review while dormant curated families preserve prior behavior.';
 comment on function private.owner_transition_listing(uuid, text) is

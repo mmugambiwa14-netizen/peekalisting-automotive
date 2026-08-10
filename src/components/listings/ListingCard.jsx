@@ -64,6 +64,13 @@ function tourSummary(listing) {
   };
 }
 
+function automotiveSellerBadge(listing, type) {
+  if (type !== 'car') return null;
+  if (listing.seller_type === 'dealer') return { label: 'Dealer', variant: 'secondary' };
+  if (listing.seller_type === 'private') return { label: 'Private seller', variant: 'outline' };
+  return null;
+}
+
 export default function ListingCard({
   listing,
   type = 'property',
@@ -117,6 +124,7 @@ export default function ListingCard({
   const availability = statusLabel(listing.status);
   const badges = [
     listing.is_featured && { label: 'Featured' },
+    automotiveSellerBadge(listing, type),
     availability && { label: availability, variant: 'destructive' },
   ].filter(Boolean);
   const enquiryEligible = ['available', 'under_offer'].includes(listing.status);

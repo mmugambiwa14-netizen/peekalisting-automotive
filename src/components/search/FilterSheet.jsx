@@ -25,6 +25,8 @@ function copyFilters(filters) {
     category: filters.category || '',
     bedrooms: filters.bedrooms || '',
     make: filters.make || '',
+    model: filters.model || '',
+    sellerType: filters.sellerType || '',
     condition: filters.condition || '',
     fuelType: filters.fuelType || '',
     transmission: filters.transmission || '',
@@ -40,7 +42,7 @@ function copyFilters(filters) {
 }
 
 const EMPTY_FILTERS = Object.freeze({
-  category: '', bedrooms: '', make: '', condition: '', fuelType: '', transmission: '',
+  category: '', bedrooms: '', make: '', model: '', sellerType: '', condition: '', fuelType: '', transmission: '',
   bodyType: '', drivetrain: '', importStatus: '', minYear: '', maxYear: '', maxMileage: '', peekOnly: false, currency: '',
 });
 
@@ -79,7 +81,7 @@ export default function FilterSheet({ open, onOpenChange, type, categoryOptions,
         <div className="space-y-6 py-5">
           {open && <HierarchicalLocationSelector value={draftLocation} onSelectLocation={setDraftLocation} />}
           {type === 'property' && <PropertyFilters category={draftFilters.category} categoryOptions={categoryOptions} bedrooms={draftFilters.bedrooms} onUpdate={updateDraft} />}
-          {type === 'car' && <VehicleFilters category={draftFilters.category} categoryOptions={categoryOptions} make={draftFilters.make} condition={draftFilters.condition} fuelType={draftFilters.fuelType} transmission={draftFilters.transmission} bodyType={draftFilters.bodyType} drivetrain={draftFilters.drivetrain} importStatus={draftFilters.importStatus} minYear={draftFilters.minYear} maxYear={draftFilters.maxYear} maxMileage={draftFilters.maxMileage} peekOnly={draftFilters.peekOnly} onUpdate={updateDraft} />}
+          {type === 'car' && <VehicleFilters category={draftFilters.category} categoryOptions={categoryOptions} make={draftFilters.make} model={draftFilters.model} sellerType={draftFilters.sellerType} condition={draftFilters.condition} fuelType={draftFilters.fuelType} transmission={draftFilters.transmission} bodyType={draftFilters.bodyType} drivetrain={draftFilters.drivetrain} importStatus={draftFilters.importStatus} minYear={draftFilters.minYear} maxYear={draftFilters.maxYear} maxMileage={draftFilters.maxMileage} peekOnly={draftFilters.peekOnly} onUpdate={updateDraft} />}
           {type === 'machinery' && <EquipmentFilters category={draftFilters.category} categoryOptions={categoryOptions} make={draftFilters.make} condition={draftFilters.condition} onUpdate={updateDraft} />}
 
           <div className="rounded-2xl border border-border bg-surface-secondary p-4">

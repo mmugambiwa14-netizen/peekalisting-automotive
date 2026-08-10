@@ -30,6 +30,11 @@ export const AUTOMOTIVE_IMPORT_STATUSES = Object.freeze([
   { value: 'imported_unregistered', label: 'Imported, not yet registered' },
 ]);
 
+export const AUTOMOTIVE_SELLER_TYPES = Object.freeze([
+  { value: 'dealer', label: 'Dealer' },
+  { value: 'private', label: 'Private seller' },
+]);
+
 export const AUTOMOTIVE_FEATURED_MAKES = Object.freeze([
   'Toyota',
   'Honda',
