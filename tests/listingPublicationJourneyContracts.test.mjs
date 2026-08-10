@@ -85,7 +85,7 @@ test('public cards details search and seller inventory use available listing bou
   assert.match(publicService, /hydrateListingImages/);
   assert.match(publicRepository, /PUBLIC_LISTING_SELECT/);
   assert.match(publicRepository, /\.in\('status', \['available', 'under_offer'\]\)/);
-  assert.match(publicRepository, /public_listing_search_card_page_v2/);
+  assert.match(publicRepository, /public_listing_search_card_page_v3/);
   assert.match(app, /property\/\:id|property\/:id/);
   assert.match(app, /car\/\:id|car\/:id/);
   assert.match(app, /machinery\/\:id|machinery\/:id/);
