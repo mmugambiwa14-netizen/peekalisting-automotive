@@ -43,7 +43,7 @@ begin
     profile.id,
     profile.user_id,
     profile.company_name,
-    profile.business_type,
+    profile.business_type::text,
     profile.profile_type,
     profile.city,
     profile.address,
@@ -53,7 +53,10 @@ begin
     profile.created_at,
     profile.updated_at
   from public.business_profiles profile
-  where profile.profile_type = 'dealer'
+  join public.users account on account.id = profile.user_id
+  where account.status = 'active'::public.user_status
+    and profile.business_type = 'car_dealership'::public.business_type
+    and profile.profile_type = 'dealer'
     and profile.verified = true
     and exists (
       select 1
@@ -122,6 +125,6 @@ grant execute on function public.public_automotive_dealers_page(text,timestamptz
   to anon, authenticated, service_role;
 
 comment on function public.public_automotive_dealers_page(text,timestamptz,uuid,integer) is
-  'Minimal public automotive dealer directory. A dealer appears only while its Cars business category remains approved.';
+  'Minimal public automotive dealer directory. A dealer appears only while the account is active, the profile is a verified car dealership and Cars business approval remains current.';
 
 commit;
