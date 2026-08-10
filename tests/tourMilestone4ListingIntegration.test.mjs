@@ -105,7 +105,7 @@ test('cards and details use one canonical identity with explicit Peek deep links
   for (const functionBody of [latestFunction, suggestionsFunction]) {
     assert.match(functionBody, /\.in\('status', \['available', 'under_offer'\]\)/);
   }
-  assert.match(searchFunction, /public_listing_search_card_page_v1/);
+  assert.match(searchFunction, /public_listing_search_card_page_v3/);
   assert.match(searchCardMigration, /create or replace function public\.public_listing_search_card_page_v1/);
   assert.match(searchCardMigration, /listing\.status in \('available', 'under_offer'\)/);
 });
