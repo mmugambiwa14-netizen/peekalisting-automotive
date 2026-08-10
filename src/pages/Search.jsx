@@ -10,7 +10,7 @@ import SearchToolbar from '@/components/search/SearchToolbar';
 import SortSheet, { getSortLabel } from '@/components/search/SortSheet';
 import { featureFlags } from '@/lib/featureFlags';
 import { CONDITIONS, FUEL_TYPES, TRANSMISSIONS } from '@/lib/constants';
-import { AUTOMOTIVE_BODY_TYPES, AUTOMOTIVE_DRIVETRAINS, AUTOMOTIVE_IMPORT_STATUSES, launchVehicleCategoryOptions } from '@/lib/automotiveConfig';
+import { AUTOMOTIVE_BODY_TYPES, AUTOMOTIVE_DRIVETRAINS, AUTOMOTIVE_IMPORT_STATUSES, AUTOMOTIVE_SELLER_TYPES, launchVehicleCategoryOptions } from '@/lib/automotiveConfig';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getCurrencyConfig, getSupportedListingCurrencies, LAUNCH_COUNTRY_CODE } from '@/lib/marketConfig';
 import { getPublicSearchSuggestions, searchPublicListingsPage } from '@/services/publicListingsService';
@@ -21,6 +21,7 @@ const TYPE = 'car';
 const VALID_SORTS = new Set(['newest', 'price_asc', 'price_desc']);
 const PRICE_SORTS = new Set(['price_asc', 'price_desc']);
 const VALID_VIEWS = new Set(['list', 'map']);
+const VALID_SELLER_TYPES = new Set(AUTOMOTIVE_SELLER_TYPES.map((item) => item.value));
 const VALID_PRICE_CURRENCIES = new Set(getSupportedListingCurrencies(LAUNCH_COUNTRY_CODE).map((currency) => currency.code));
 const RECENT_SEARCHES_KEY = 'peekalisting.automotive-recent-searches';
 
@@ -77,6 +78,9 @@ export default function Search() {
   const viewMode = featureFlags.maps && VALID_VIEWS.has(requestedView) ? requestedView : 'list';
   const category = searchParams.get('category') || '';
   const make = searchParams.get('make') || '';
+  const model = (searchParams.get('model') || '').slice(0, 80);
+  const requestedSellerType = (searchParams.get('sellerType') || '').toLowerCase();
+  const sellerType = VALID_SELLER_TYPES.has(requestedSellerType) ? requestedSellerType : '';
   const condition = searchParams.get('condition') || '';
   const fuelType = searchParams.get('fuel') || '';
   const transmission = searchParams.get('transmission') || '';
@@ -103,10 +107,10 @@ export default function Search() {
   const selectedLocation = useMemo(() => locationId ? { country: locationCountry, state: locationProvince, city: locationId, cityName: locationName } : null, [locationId, locationCountry, locationProvince, locationName]);
 
   const filterValues = useMemo(() => ({
-    category, make, condition, fuelType, transmission, bodyType, drivetrain, importStatus,
+    category, make, model, sellerType, condition, fuelType, transmission, bodyType, drivetrain, importStatus,
     minYear: minYear ?? '', maxYear: maxYear ?? '', maxMileage: maxMileage ?? '', peekOnly,
     currency, minPrice, maxPrice,
-  }), [category, make, condition, fuelType, transmission, bodyType, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, currency, minPrice, maxPrice]);
+  }), [category, make, model, sellerType, condition, fuelType, transmission, bodyType, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, currency, minPrice, maxPrice]);
 
   const updateParams = useCallback((updates, { replace = true } = {}) => {
     setSearchParams((current) => {
@@ -130,23 +134,25 @@ export default function Search() {
   useEffect(() => {
     const orphanedPriceState = !currency && (searchParams.has('minPrice') || searchParams.has('maxPrice') || PRICE_SORTS.has(normalizedSort));
     const invalidCurrency = Boolean(requestedCurrency && !currency);
+    const invalidSellerType = Boolean(requestedSellerType && !sellerType);
     const legacyPage = searchParams.has('page');
-    if (!orphanedPriceState && !invalidCurrency && !legacyPage) return;
+    if (!orphanedPriceState && !invalidCurrency && !invalidSellerType && !legacyPage) return;
     setSearchParams((current) => {
       const next = new URLSearchParams(current); next.set('type', TYPE); next.delete('page');
       if (orphanedPriceState || invalidCurrency) { next.delete('minPrice'); next.delete('maxPrice'); }
       if (invalidCurrency) next.delete('currency');
+      if (invalidSellerType) next.delete('sellerType');
       if ((orphanedPriceState || invalidCurrency) && PRICE_SORTS.has(next.get('sort'))) next.delete('sort');
       return next;
     }, { replace: true });
-  }, [currency, normalizedSort, requestedCurrency, searchParams, setSearchParams]);
+  }, [currency, normalizedSort, requestedCurrency, requestedSellerType, searchParams, sellerType, setSearchParams]);
 
   const suggestionQuery = useDebouncedValue(queryInput.trim().slice(0, 100), 250);
   const request = useMemo(() => ({
     kind: TYPE, countryCode: LAUNCH_COUNTRY_CODE, currency, query, category, locationId, minPrice, maxPrice,
-    brand: make, condition, fuelType, transmission, bodyType, drivetrain, importStatus,
+    brand: make, model, sellerType, condition, fuelType, transmission, bodyType, drivetrain, importStatus,
     minYear, maxYear, maxMileage, peekOnly, sort,
-  }), [currency, query, category, locationId, minPrice, maxPrice, make, condition, fuelType, transmission, bodyType, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, sort]);
+  }), [currency, query, category, locationId, minPrice, maxPrice, make, model, sellerType, condition, fuelType, transmission, bodyType, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, sort]);
 
   const { data: suggestions } = useQuery({ queryKey: ['public-search-suggestions', TYPE, suggestionQuery], queryFn: ({ signal }) => getPublicSearchSuggestions(TYPE, suggestionQuery, { signal }), enabled: suggestionQuery.length >= 2, staleTime: 60_000 });
   const categorySuggestions = useMemo(() => suggestionQuery.length < 2 ? [] : categoryOptions.filter((item) => item.label.toLowerCase().includes(suggestionQuery.toLowerCase())).slice(0, 3), [categoryOptions, suggestionQuery]);
@@ -155,7 +161,7 @@ export default function Search() {
   const resultsQuery = useInfiniteQuery({ queryKey: ['public-listing-search-page', request], queryFn: ({ pageParam, signal }) => searchPublicListingsPage({ ...request, cursor: pageParam || null }, { signal }), initialPageParam: null, getNextPageParam: (lastPage) => lastPage.nextCursor || undefined, staleTime: 30_000 });
   const listings = useMemo(() => { const byId = new Map(); for (const pageResult of resultsQuery.data?.pages || []) for (const item of pageResult.items) byId.set(item.id, item); return [...byId.values()]; }, [resultsQuery.data]);
 
-  const hasFilters = Boolean(category || locationId || make || condition || fuelType || transmission || bodyType || drivetrain || importStatus || minYear !== null || maxYear !== null || maxMileage !== null || peekOnly || currency || minPrice !== null || maxPrice !== null);
+  const hasFilters = Boolean(category || locationId || make || model || sellerType || condition || fuelType || transmission || bodyType || drivetrain || importStatus || minYear !== null || maxYear !== null || maxMileage !== null || peekOnly || currency || minPrice !== null || maxPrice !== null);
 
   const rememberSearch = (value) => {
     const normalized = value.trim(); if (!normalized) return;
@@ -166,7 +172,7 @@ export default function Search() {
   const clearRecentSearches = () => { setRecentSearches([]); try { removeStoredValue('local', RECENT_SEARCHES_KEY); } catch { /* no-op */ } };
 
   const clearFilters = () => {
-    const updates = { category: null, location: null, locationName: null, country: null, province: null, make: null, condition: null, fuel: null, transmission: null, bodyType: null, drivetrain: null, importStatus: null, minYear: null, maxYear: null, maxMileage: null, peekOnly: null, currency: null, minPrice: null, maxPrice: null };
+    const updates = { category: null, location: null, locationName: null, country: null, province: null, make: null, model: null, sellerType: null, condition: null, fuel: null, transmission: null, bodyType: null, drivetrain: null, importStatus: null, minYear: null, maxYear: null, maxMileage: null, peekOnly: null, currency: null, minPrice: null, maxPrice: null };
     if (PRICE_SORTS.has(sort)) updates.sort = null;
     updateParams(updates);
   };
@@ -177,7 +183,7 @@ export default function Search() {
   const applyFilterSheet = ({ filters: nextFilters, location }) => {
     const nextCurrency = nextFilters.currency || null;
     const updates = {
-      category: nextFilters.category || null, make: nextFilters.make || null, condition: nextFilters.condition || null,
+      category: nextFilters.category || null, make: nextFilters.make || null, model: nextFilters.model?.trim() || null, sellerType: nextFilters.sellerType || null, condition: nextFilters.condition || null,
       fuel: nextFilters.fuelType || null, transmission: nextFilters.transmission || null, bodyType: nextFilters.bodyType || null,
       drivetrain: nextFilters.drivetrain || null, importStatus: nextFilters.importStatus || null,
       minYear: nextFilters.minYear || null, maxYear: nextFilters.maxYear || null, maxMileage: nextFilters.maxMileage || null,
@@ -194,6 +200,8 @@ export default function Search() {
     if (category) filters.push({ key: 'category', label: optionLabel(categoryOptions, category) });
     if (locationId) filters.push({ key: 'location', label: selectedLocation?.cityName || 'Location' });
     if (make) filters.push({ key: 'make', label: make });
+    if (model) filters.push({ key: 'model', label: `Model: ${model}` });
+    if (sellerType) filters.push({ key: 'sellerType', label: optionLabel(AUTOMOTIVE_SELLER_TYPES, sellerType) });
     if (bodyType) filters.push({ key: 'bodyType', label: optionLabel(AUTOMOTIVE_BODY_TYPES, bodyType) });
     if (condition) filters.push({ key: 'condition', label: optionLabel(CONDITIONS, condition) });
     if (fuelType) filters.push({ key: 'fuel', label: optionLabel(FUEL_TYPES, fuelType) });
@@ -205,7 +213,7 @@ export default function Search() {
     if (peekOnly) filters.push({ key: 'peekOnly', label: 'Peek available' });
     if (currency) { const config = getCurrencyConfig(currency); filters.push({ key: 'currency', label: `${config.name} (${config.symbol})` }); const priceLabel = priceFilterLabel(minPrice, maxPrice, currency, formatNative); if (priceLabel) filters.push({ key: 'price', label: priceLabel }); }
     return filters;
-  }, [category, categoryOptions, locationId, selectedLocation?.cityName, make, bodyType, condition, fuelType, transmission, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, currency, minPrice, maxPrice, formatNative]);
+  }, [category, categoryOptions, locationId, selectedLocation?.cityName, make, model, sellerType, bodyType, condition, fuelType, transmission, drivetrain, importStatus, minYear, maxYear, maxMileage, peekOnly, currency, minPrice, maxPrice, formatNative]);
 
   const removeFilter = (key) => {
     if (key === 'location') updateParams({ location: null, locationName: null, country: null, province: null });
