@@ -38,7 +38,6 @@ returns table (
   kind text,
   seller_id uuid,
   seller_name text,
-  attributes jsonb,
   has_contact_phone boolean,
   has_contact_whatsapp boolean,
   has_contact_email boolean,
@@ -138,7 +137,6 @@ begin
     listing.kind::text,
     listing.seller_id,
     listing.seller_name,
-    listing.attributes,
     listing.has_contact_phone,
     listing.has_contact_whatsapp,
     listing.has_contact_email,
@@ -255,7 +253,7 @@ create or replace function public.public_listing_search_card_page_v2(
   p_cursor_id uuid default null, p_limit integer default 24
 )
 returns table (
-  id uuid, kind text, seller_id uuid, seller_name text, attributes jsonb,
+  id uuid, kind text, seller_id uuid, seller_name text,
   has_contact_phone boolean, has_contact_whatsapp boolean, has_contact_email boolean,
   title text, price numeric, currency text, variants jsonb, photos jsonb, latitude numeric,
   longitude numeric, public_location_label text, category text, listing_type text, status text,
@@ -283,6 +281,6 @@ grant execute on function public.public_listing_search_card_page_v2(
 
 comment on function public.public_listing_search_card_page_v2(
   text,text,text,text,text,text,numeric,numeric,integer,text,text,text,text,text,text,text,integer,integer,integer,boolean,text,text,uuid,integer
-) is 'Bounded automotive-aware marketplace search with deep vehicle facets, Peek availability, privacy-safe location and keyset pagination.';
+) is 'Bounded automotive-aware marketplace card search with deep vehicle facets, Peek availability, minimal public projection, privacy-safe location and keyset pagination.';
 
 commit;
