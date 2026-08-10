@@ -28,6 +28,7 @@ export default function MarketplaceCard({
   tourLabel = 'Peek',
   sellerName = null,
   sellerLabel = 'Seller',
+  sellerPath = null,
   actions = null,
   layout = 'grid',
   className = null,
@@ -165,6 +166,13 @@ export default function MarketplaceCard({
     </Link>
   );
 
+  const sellerIdentity = sellerName ? (
+    <div className="flex min-w-0 items-center gap-2.5 bg-surface-secondary/35 px-3 py-2.5">
+      <span className="clay-icon h-9 w-9 shrink-0 text-muted-foreground"><Building2 className="h-4 w-4" /></span>
+      <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">{sellerLabel}</p><p className="truncate text-xs font-semibold text-foreground">{sellerName}</p></div>
+    </div>
+  ) : null;
+
   return (
     <article className={cn(
       'clay-card group relative overflow-hidden rounded-2xl transition-transform duration-200 hover:-translate-y-0.5 hover:border-primary/20',
@@ -192,12 +200,11 @@ export default function MarketplaceCard({
 
       {browseLayout && (sellerName || actions) && (
         <div className="border-t border-border">
-          {sellerName && (
-            <div className="flex min-w-0 items-center gap-2.5 bg-surface-secondary/35 px-3 py-2.5">
-              <span className="clay-icon h-9 w-9 shrink-0 text-muted-foreground"><Building2 className="h-4 w-4" /></span>
-              <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">{sellerLabel}</p><p className="truncate text-xs font-semibold text-foreground">{sellerName}</p></div>
-            </div>
-          )}
+          {sellerIdentity && (sellerPath ? (
+            <Link to={sellerPath} className="block transition hover:bg-primary/[0.04]" aria-label={`Open ${sellerName} profile`}>
+              {sellerIdentity}
+            </Link>
+          ) : sellerIdentity)}
           {actions && <div className="p-2.5">{actions}</div>}
         </div>
       )}
