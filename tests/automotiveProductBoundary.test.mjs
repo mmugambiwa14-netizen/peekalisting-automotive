@@ -16,10 +16,13 @@ test('public shell is automotive-first without deleting reusable dormant routes'
   assert.match(home, /Find the car\. See more before you go\./);
   assert.match(home, /Newly listed cars/);
   assert.match(home, /Cars with Peeks|HomePeekRail/);
+  assert.match(home, /to="\/dealers"/);
+  assert.match(home, /to="\/services"/);
   assert.doesNotMatch(home, /DiscoverCategoryGrid/);
   assert.match(nav, /label: 'Sell'/);
   assert.doesNotMatch(nav, /label: 'Post'/);
   assert.ok(app.includes('path="/post" element={<CreateListing />}'));
+  assert.ok(app.includes('path="/dealers" element={<Dealers />}'));
   assert.doesNotMatch(app, /BusinessPublishingGate><CreateListing/);
   assert.match(app, /path="\/property\/:id"/);
   assert.match(app, /path="\/machinery\/:id"/);
@@ -54,7 +57,7 @@ test('private vehicle submission remains moderated and other domains remain cura
   assert.match(launchMigration, /pending_review/);
 });
 
-test('vehicle discovery exposes globally useful independent facets', async () => {
+test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
   const [search, filters, repository, migration] = await Promise.all([
     source('src/pages/Search.jsx'),
     source('src/components/search/VehicleFilters.jsx'),
@@ -74,13 +77,45 @@ test('vehicle discovery exposes globally useful independent facets', async () =>
   assert.match(migration, /listing_tour_slots/);
   assert.match(migration, /p_max_mileage/);
   assert.match(migration, /kind = 'car'::public\.listing_kind/);
+  const privateReturnStart = migration.indexOf('returns table (');
+  const privateReturnEnd = migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
+  assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
+  assert.doesNotMatch(migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
 });
 
-test('automotive Peek prompts ask for observable evidence instead of generic video', async () => {
-  const categories = await source('src/domain/peekThreads/categories.js');
+test('automotive Peek surfaces ask for observable evidence instead of becoming a generic media feed', async () => {
+  const [categories, feed, detail] = await Promise.all([
+    source('src/domain/peekThreads/categories.js'),
+    source('src/pages/Tours.jsx'),
+    source('src/pages/CarDetail.jsx'),
+  ]);
   assert.match(categories, /Walk around the exterior slowly in one continuous view/);
   assert.match(categories, /Show all four tyres and the tread clearly/);
   assert.match(categories, /dashboard and odometer/);
   assert.match(categories, /Show the engine bay clearly/);
   assert.match(categories, /personal details kept out of frame/);
+  assert.match(feed, /const VEHICLE_PEEK_CATEGORY = 'car'/);
+  assert.doesNotMatch(feed, /Property.*Cars.*Machinery.*Services/s);
+  assert.match(feed, /not a mechanical inspection or a guarantee of vehicle condition/);
+  assert.match(detail, /Captured through PeekaListing/);
+  assert.match(detail, /Seller-declared/);
+});
+
+test('dealers and automotive services reuse existing business and service systems', async () => {
+  const [dealersRepository, dealersPage, servicesPage, servicesRepository, serviceTaxonomy] = await Promise.all([
+    source('src/repositories/dealersRepository.js'),
+    source('src/pages/Dealers.jsx'),
+    source('src/pages/Services.jsx'),
+    source('src/repositories/servicesRepository.js'),
+    source('supabase/migrations/20260810152000_automotive_service_taxonomy.sql'),
+  ]);
+
+  assert.match(dealersRepository, /business_profiles_public/);
+  assert.match(dealersRepository, /profile_type', 'dealer'/);
+  assert.match(dealersPage, /View dealer inventory/);
+  assert.match(servicesPage, /const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic'/);
+  assert.match(servicesRepository, /contains\('subcategories', \[request\.specialization\]\)/);
+  for (const specialization of ['pre_purchase_inspection', 'vehicle_diagnostics', 'tyres_wheels', 'panel_beating', 'vehicle_towing', 'vehicle_transport']) {
+    assert.match(serviceTaxonomy, new RegExp(specialization));
+  }
 });
