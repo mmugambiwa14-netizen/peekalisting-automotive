@@ -17,7 +17,6 @@ import { PwaProvider } from '@/components/pwa/PwaProvider';
 import PwaStatusBar from '@/components/pwa/PwaStatusBar';
 import GlobalRefreshButton from '@/components/pwa/GlobalRefreshButton';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
-import BusinessPublishingGate from '@/components/business/BusinessPublishingGate';
 import { createLoginPath } from '@/lib/authNavigation';
 import { featureFlags } from '@/lib/featureFlags';
 import { queryClientInstance } from '@/lib/query-client';
@@ -134,16 +133,9 @@ const AuthenticatedApp = () => {
   const location = useLocation();
   const mfaGate = useMfaGate({ isAuthenticated, authChecked });
 
-  // OAuth callbacks must render before the normal auth/MFA gate. The callback
-  // may be the first page loaded in a browser window opened by an installed
-  // PWA, and it is responsible for handing the session back to that PWA.
   const isOAuthCallbackRoute = location.pathname.replace(/\/+$/, '').endsWith('/auth/callback');
   if (isOAuthCallbackRoute) {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <OAuthCallback />
-      </Suspense>
-    );
+    return <Suspense fallback={<LoadingScreen />}><OAuthCallback /></Suspense>;
   }
 
   if (isLoadingPublicSettings || isLoadingAuth) return <LoadingScreen />;
@@ -192,7 +184,7 @@ const AuthenticatedApp = () => {
         </Route>
         <Route element={<ProtectedRoute unauthenticatedElement={<SignInRedirect />} />}>
           <Route element={<AppLayout />}>
-            <Route path="/post" element={<BusinessPublishingGate><CreateListing /></BusinessPublishingGate>} />
+            <Route path="/post" element={<CreateListing />} />
             <Route path="/create-service" element={<CuratedCreateService />} />
             <Route path="/my-services" element={<MyServices />} />
             <Route path="/saved" element={<Saved />} />
