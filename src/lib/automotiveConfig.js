@@ -3,13 +3,13 @@ export const AUTOMOTIVE_LAUNCH_OFFER = 'sale';
 
 export const AUTOMOTIVE_LAUNCH_SUBTYPES = Object.freeze(new Set(['car', 'bakkie', 'van']));
 
+// These values intentionally mirror the canonical vehicle schema. Future
+// markets can expand visibility without inventing a second taxonomy vocabulary.
 export const AUTOMOTIVE_BODY_TYPES = Object.freeze([
   { value: 'hatchback', label: 'Hatchback' },
   { value: 'sedan', label: 'Sedan' },
   { value: 'suv', label: 'SUV' },
-  { value: 'crossover', label: 'Crossover' },
   { value: 'bakkie', label: 'Pickup / bakkie' },
-  { value: 'mpv', label: 'MPV' },
   { value: 'minibus', label: 'Minibus / kombi' },
   { value: 'panel_van', label: 'Panel van' },
   { value: 'wagon', label: 'Wagon' },
