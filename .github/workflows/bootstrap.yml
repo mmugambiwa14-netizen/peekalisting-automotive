@@ -1,7 +1,7 @@
 name: Bootstrap automotive baseline
 
 on:
-  push:
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   bootstrap:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Check out bootstrap repository
@@ -41,8 +42,8 @@ jobs:
 
           (cd "${tmp_dir}/source" && tar --exclude=.git -cf - .) | tar -xf -
 
-          # Keep source CI/deployment definitions for reference, but do not let
-          # inherited automation deploy or certify the automotive experiment.
+          # Preserve the source CI/deployment definitions without activating them
+          # in this experimental repository.
           if [ -d .github/workflows ]; then
             rm -rf .github/source-workflows
             mv .github/workflows .github/source-workflows
@@ -168,3 +169,7 @@ EOF
           git add -A
           git commit -m "Bootstrap PeekaListing automotive baseline"
           git push --force origin HEAD:main
+
+          if [ -n "${GITHUB_HEAD_REF:-}" ]; then
+            git push origin --delete "${GITHUB_HEAD_REF}" || true
+          fi
