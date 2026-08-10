@@ -34,9 +34,9 @@ jobs:
       VITE_BASE_PATH: /
       VITE_PUBLIC_APP_ORIGIN: https://cars-staging.peekalisting.com
       PEEKALISTING_AUTOMOTIVE_STAGING_ORIGIN: https://cars-staging.peekalisting.com
-      PEEKALISTING_EXPECTED_PROJECT_REF: ${{ vars.PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF }}
-      FINDIT_EXPECTED_PROJECT_REF: ${{ vars.PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF }}
-      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      PEEKALISTING_EXPECTED_PROJECT_REF: epllatutrwbxnmsikkuc
+      FINDIT_EXPECTED_PROJECT_REF: epllatutrwbxnmsikkuc
+      VITE_SUPABASE_URL: https://epllatutrwbxnmsikkuc.supabase.co
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_AUTH_GOOGLE_ENABLED: ${{ vars.VITE_AUTH_GOOGLE_ENABLED || 'false' }}
       VITE_AUTH_APPLE_ENABLED: "false"
