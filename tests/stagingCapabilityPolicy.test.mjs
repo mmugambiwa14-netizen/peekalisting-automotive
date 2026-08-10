@@ -26,14 +26,15 @@ test('production, unknown and missing deployment values fail closed', () => {
   assert.equal(isTrustedStagingDeployment({ VITE_DEPLOY_ENV: 'untrusted-preview' }), false);
 });
 
-test('the dedicated Cloudflare staging custom domain is recognized', () => {
-  assert.equal(isTrustedStagingHost('staging.peekalisting.com'), true);
-  assert.equal(isTrustedStagingHost('STAGING.PEEKALISTING.COM'), true);
+test('the dedicated automotive staging custom domain is recognized', () => {
+  assert.equal(isTrustedStagingHost('cars-staging.peekalisting.com'), true);
+  assert.equal(isTrustedStagingHost('CARS-STAGING.PEEKALISTING.COM'), true);
 });
 
-test('production and generated platform hosts are not trusted by hostname alone', () => {
+test('production, inherited staging and generated platform hosts are not trusted by hostname alone', () => {
   assert.equal(isTrustedStagingHost('peekalisting.com'), false);
   assert.equal(isTrustedStagingHost('www.peekalisting.com'), false);
+  assert.equal(isTrustedStagingHost('staging.peekalisting.com'), false);
   assert.equal(isTrustedStagingHost('findit-marketplace.pages.dev'), false);
   assert.equal(isTrustedStagingHost('abc123.findit-marketplace.pages.dev'), false);
   assert.equal(isTrustedStagingHost(''), false);
