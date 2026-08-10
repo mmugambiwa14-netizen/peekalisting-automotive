@@ -110,7 +110,7 @@ test('active repository uses the thin card keyset RPC argument contract', () => 
     repository.indexOf('export async function findPublicListingsPage'),
     repository.indexOf('export async function findPublicListingTitleSuggestions'),
   );
-  assert.match(active, /supabase\.rpc\('public_listing_search_card_page_v1'/);
+  assert.match(active, /supabase\.rpc\('public_listing_search_card_page_v3'/);
   assert.doesNotMatch(active, /supabase\.rpc\('public_listing_search_page_v2'/);
   assert.doesNotMatch(active, /supabase\.rpc\('public_listing_search_page'/);
   for (const argument of [
