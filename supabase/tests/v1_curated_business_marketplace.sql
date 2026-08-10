@@ -72,9 +72,10 @@ select extensions.is(
   'private vehicle remains pending until moderation approves publication'
 );
 
--- Direct table writes cannot use the open seller rule as a self-publication
--- channel, even when the caller otherwise owns the vehicle row.
-select extensions.throws_ok(
+-- The mature submission transaction historically presents validated rows as
+-- available. The automotive trigger must normalize that incoming state rather
+-- than reject the real RPC path or permit publication.
+select extensions.lives_ok(
   $$insert into public.listings (
       id, kind, seller_id, seller_name, title, description, price, currency,
       native_price, native_currency, photos, category, listing_type, status
@@ -82,12 +83,15 @@ select extensions.throws_ok(
       '41000000-0000-4000-8000-000000000405', 'car',
       '41000000-0000-4000-8000-000000000002', 'Private Seller',
       'Attempted direct-public vehicle',
-      'A certification row proving that open vehicle submission cannot be converted into direct public publication.',
+      'A certification row proving that an incoming public state is forced back into moderation.',
       15100, 'USD', 15100, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'available'
     )$$,
-  '42501',
-  'Vehicle submissions must enter review before publication',
-  'private seller cannot insert an already-public vehicle'
+  'automotive boundary accepts the mature transaction shape without publishing it'
+);
+select extensions.is(
+  (select status::text from public.listings where id = '41000000-0000-4000-8000-000000000405'),
+  'pending_review',
+  'incoming available Cars state is normalized to pending review'
 );
 
 select extensions.throws_ok(
@@ -190,7 +194,7 @@ select extensions.lives_ok(
       '41000000-0000-4000-8000-000000000001', 'Approved Dealer',
       'Vehicle after dealer suspension',
       'A complete certification listing proving private automotive submission remains independent from dealer-category status.',
-      13000, 'USD', 13000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'pending_review'
+      13000, 'USD', 13000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'available'
     )$$,
   'active owner may still submit a vehicle after dealership capability is suspended'
 );
