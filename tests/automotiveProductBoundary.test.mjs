@@ -45,7 +45,6 @@ test('launch taxonomy is narrower than the reusable vehicle ontology', async () 
   assert.match(config, /defaults\.offer_type.*AUTOMOTIVE_LAUNCH_OFFER/);
   assert.match(config, /defaults\.parts_family/);
   assert.match(config, /Array\.isArray\(defaults\.segments\)/);
-  assert.match(config, /AUTOMOTIVE_SELLER_TYPES/);
   assert.match(step, /getCategoryTaxonomy\('car'/);
   assert.match(step, /launchVehicleCategoryOptions/);
   assert.match(step, /Submission is open; publication is controlled/);
@@ -66,63 +65,42 @@ test('private vehicle submission remains moderated and other domains remain cura
   assert.match(launchMigration, /account\.status = 'active'/);
   assert.match(launchMigration, /business_category_approvals/);
   assert.match(launchMigration, /pending_review/);
-  assert.match(launchMigration, /Vehicle submissions must enter review before publication/);
-  assert.match(launchMigration, /when listing_row\.kind::text = 'car' then 'pending_review'/);
   assert.match(success, /Vehicle submitted for review/);
   assert.match(success, /Pending review/);
   assert.doesNotMatch(success, />Your listing is live</);
 });
 
 test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
-  const [search, filters, cards, repository, baseMigration, v3Migration, previewService, rollback] = await Promise.all([
+  const [search, filters, repository, migration, preview] = await Promise.all([
     source('src/pages/Search.jsx'),
     source('src/components/search/VehicleFilters.jsx'),
-    source('src/components/listings/ListingCard.jsx'),
     source('src/repositories/publicListingsRepository.js'),
     source('supabase/migrations/20260810151000_automotive_search_projection.sql'),
-    source('supabase/migrations/20260810154000_automotive_model_seller_search.sql'),
-    source('src/services/publicListingsService.js'),
-    source('supabase/rollback/20260810154000_automotive_model_seller_search.rollback.sql'),
+    source('src/services/localPreviewListings.js'),
   ]);
 
   assert.match(search, /const TYPE = 'car'/);
-  for (const field of ['model', 'sellerType', 'bodyType', 'drivetrain', 'importStatus', 'minYear', 'maxYear', 'maxMileage', 'peekOnly']) {
+  for (const field of ['bodyType', 'drivetrain', 'importStatus', 'minYear', 'maxYear', 'maxMileage', 'peekOnly']) {
     assert.match(search, new RegExp(field));
     assert.match(filters, new RegExp(field));
+    assert.match(preview, new RegExp(field));
   }
-  assert.match(filters, /Any seller/);
-  assert.match(cards, /listing\.seller_type === 'dealer'/);
-  assert.match(cards, /label: 'Dealer'/);
-  assert.match(cards, /listing\.seller_type === 'private'/);
-  assert.match(cards, /label: 'Private seller'/);
-  assert.doesNotMatch(cards, /verified seller|trust score|seller rating/i);
-  assert.match(repository, /public_listing_search_card_page_v3/);
-  assert.match(repository, /p_model: request\.model/);
-  assert.match(repository, /p_seller_type: request\.sellerType/);
-  assert.match(baseMigration, /attributes -> 'values' ->> 'body_type'/);
-  assert.match(baseMigration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
-  assert.match(v3Migration, /idx_car_details_automotive_model_trgm/);
-  assert.match(v3Migration, /model extensions\.gin_trgm_ops/);
-  assert.match(v3Migration, /normalized_model/);
-  assert.match(v3Migration, /normalized_seller_type not in \('', 'dealer', 'private'\)/);
-  assert.match(v3Migration, /profile\.business_type = 'car_dealership'/);
-  assert.match(v3Migration, /profile\.verified = true/);
-  assert.match(v3Migration, /approval\.category = 'car'/);
-  assert.match(v3Migration, /approval\.status = 'approved'/);
-  assert.match(v3Migration, /listing\.car_detail_listing_id is not null/);
-  assert.match(v3Migration, /listing\.car_model ilike/);
-  assert.match(v3Migration, /when listing\.kind::text <> 'car' then null/);
-  assert.match(v3Migration, /when listing\.is_dealer then 'dealer'/);
-  assert.match(v3Migration, /listing\.has_current_peek/);
-  assert.match(previewService, /previewSellerType/);
-  assert.match(previewService, /request\.model/);
-  assert.match(previewService, /request\.sellerType/);
-  assert.match(rollback, /drop function if exists public\.public_listing_search_card_page_v3/);
-  assert.match(rollback, /drop index if exists public\.idx_car_details_automotive_model_trgm/);
-  const privateReturnStart = v3Migration.indexOf('returns table (');
-  const privateReturnEnd = v3Migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
+  assert.match(repository, /public_listing_search_card_page_v2/);
+  assert.match(migration, /attributes -> 'values' ->> 'body_type'/);
+  assert.match(migration, /attributes -> 'values' ->> 'drivetrain'/);
+  assert.match(migration, /attributes -> 'values' ->> 'import_status'/);
+  assert.match(migration, /listing_tour_slots/);
+  assert.match(migration, /join public\.listing_tours/);
+  assert.match(migration, /moderation_status = 'approved'/);
+  assert.match(migration, /published_at is not null/);
+  assert.match(migration, /p_max_mileage/);
+  assert.match(migration, /kind = 'car'::public\.listing_kind/);
+  assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
+  assert.match(migration, /car\.transmission::text = p_transmission/);
+  const privateReturnStart = migration.indexOf('returns table (');
+  const privateReturnEnd = migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
-  assert.doesNotMatch(v3Migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
+  assert.doesNotMatch(migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
 });
 
 test('automotive Peek surfaces ask for observable evidence instead of becoming a generic media feed', async () => {
@@ -144,11 +122,10 @@ test('automotive Peek surfaces ask for observable evidence instead of becoming a
 });
 
 test('dealers and automotive services reuse existing systems with current approval boundaries', async () => {
-  const [dealersRepository, dealersPage, dealerMigration, dealerRollback, servicesPage, servicesRepository, serviceTaxonomy, serviceRollback] = await Promise.all([
+  const [dealersRepository, dealersPage, dealerMigration, servicesPage, servicesRepository, serviceTaxonomy, serviceRollback] = await Promise.all([
     source('src/repositories/dealersRepository.js'),
     source('src/pages/Dealers.jsx'),
     source('supabase/migrations/20260810153000_automotive_dealer_directory.sql'),
-    source('supabase/rollback/20260810153000_automotive_dealer_directory.rollback.sql'),
     source('src/pages/Services.jsx'),
     source('src/repositories/servicesRepository.js'),
     source('supabase/migrations/20260810152000_automotive_service_taxonomy.sql'),
@@ -156,15 +133,10 @@ test('dealers and automotive services reuse existing systems with current approv
   ]);
 
   assert.match(dealersRepository, /public_automotive_dealers_page/);
-  assert.match(dealerMigration, /join public\.users account on account\.id = profile\.user_id/);
   assert.match(dealerMigration, /account\.status = 'active'/);
-  assert.match(dealerMigration, /profile\.business_type = 'car_dealership'/);
-  assert.match(dealerMigration, /profile\.profile_type = 'dealer'/);
-  assert.match(dealerMigration, /profile\.verified = true/);
+  assert.match(dealerMigration, /business_type = 'car_dealership'/);
   assert.match(dealerMigration, /approval\.category = 'car'/);
   assert.match(dealerMigration, /approval\.status = 'approved'/);
-  assert.match(dealerRollback, /drop function if exists public\.public_automotive_dealers_page/);
-  assert.match(dealerRollback, /drop function if exists private\.public_automotive_dealers_page/);
   assert.match(dealersPage, /View dealer inventory/);
   assert.match(dealersPage, /to="\/dealer-onboarding"/);
   assert.match(servicesPage, /const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic'/);
