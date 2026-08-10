@@ -1,9 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Plus, UserRound } from 'lucide-react';
+import { Building2, CarFront, CirclePlay, MessageCircle, Plus, UserRound, Wrench } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { featureFlags } from '@/lib/featureFlags';
-import { isNavigationItemActive, PRIMARY_NAV_ITEMS } from '@/lib/navigationConfig';
+import { isNavigationItemActive } from '@/lib/navigationConfig';
 import { cn } from '@/lib/utils';
 import { createLoginPath } from '@/lib/authNavigation';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -11,6 +11,14 @@ import BrandLogo from '@/components/BrandLogo';
 import GlobalRefreshButton from '@/components/pwa/GlobalRefreshButton';
 
 const NotificationBell = lazy(() => import('@/components/layout/NotificationBell'));
+
+const AUTOMOTIVE_DESKTOP_NAV = Object.freeze([
+  { label: 'Cars', icon: CarFront, path: '/search?type=car', activePath: '/search' },
+  { label: 'Dealers', icon: Building2, path: '/dealers', activePath: '/dealers' },
+  { label: 'Services', icon: Wrench, path: '/services', activePath: '/services' },
+  { label: 'Peeks', icon: CirclePlay, path: '/peek', activePath: '/peek', feature: 'tours', previewFeature: 'toursPreview' },
+  { label: 'Chats', icon: MessageCircle, path: '/chats', activePath: '/chats', feature: 'messaging', countKey: 'chats' },
+]);
 
 function isItemVisible(item) {
   if (!item.feature) return true;
@@ -20,14 +28,7 @@ function isItemVisible(item) {
 
 function CountBadge({ count }) {
   if (count <= 0) return null;
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold leading-none text-primary-foreground"
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  );
+  return <span aria-hidden="true" className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold leading-none text-primary-foreground">{count > 99 ? '99+' : count}</span>;
 }
 
 export default function TopNav() {
@@ -35,23 +36,20 @@ export default function TopNav() {
   const location = useLocation();
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
   const unreadMessages = useUnreadMessages();
-  const desktopItems = PRIMARY_NAV_ITEMS.filter((item) => !item.prominent && isItemVisible(item));
+  const desktopItems = AUTOMOTIVE_DESKTOP_NAV.filter(isItemVisible);
 
   return (
     <header className="glass-bar sticky top-0 z-50 hidden border-b px-4 py-2 md:block">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-5">
         <Link to="/" className="shrink-0" aria-label="PeekaListing Discover">
-          <BrandLogo
-            markClassName="h-8 w-8 sm:h-9 sm:w-9"
-            wordmarkClassName="text-lg sm:text-xl"
-          />
+          <BrandLogo markClassName="h-8 w-8 sm:h-9 sm:w-9" wordmarkClassName="text-lg sm:text-xl" />
         </Link>
 
-        <nav className="flex min-w-0 flex-1 items-center justify-center gap-1.5" aria-label="Primary navigation">
+        <nav className="flex min-w-0 flex-1 items-center justify-center gap-1.5" aria-label="Automotive marketplace navigation">
           {desktopItems.map((item) => {
             const Icon = item.icon;
-            const active = isNavigationItemActive(location.pathname, item.path, item.exact);
-            const count = item.path === '/chats' ? unreadMessages : 0;
+            const active = isNavigationItemActive(location.pathname, item.activePath, item.activePath === '/search');
+            const count = item.countKey === 'chats' ? unreadMessages : 0;
             return (
               <Link
                 key={item.path}
@@ -72,15 +70,10 @@ export default function TopNav() {
 
         <div className="flex shrink-0 items-center gap-1.5">
           <GlobalRefreshButton desktop />
-          {user && featureFlags.essentialNotifications && (
-            <Suspense fallback={null}><NotificationBell /></Suspense>
-          )}
-          <Link
-            to="/post"
-            className="clay-button inline-flex h-11 items-center gap-1.5 px-4 text-sm font-bold"
-          >
+          {user && featureFlags.essentialNotifications && <Suspense fallback={null}><NotificationBell /></Suspense>}
+          <Link to="/post" className="clay-button inline-flex h-11 items-center gap-1.5 px-4 text-sm font-bold">
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            <span>Post</span>
+            <span>Sell</span>
           </Link>
           <Link
             to={user ? '/profile' : createLoginPath(currentPath)}
