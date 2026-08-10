@@ -70,9 +70,10 @@ test('private vehicle submission remains moderated and other domains remain cura
 });
 
 test('vehicle discovery exposes globally useful independent facets through a minimal public projection', async () => {
-  const [search, filters, repository, baseMigration, v3Migration, previewService, rollback] = await Promise.all([
+  const [search, filters, cards, repository, baseMigration, v3Migration, previewService, rollback] = await Promise.all([
     source('src/pages/Search.jsx'),
     source('src/components/search/VehicleFilters.jsx'),
+    source('src/components/listings/ListingCard.jsx'),
     source('src/repositories/publicListingsRepository.js'),
     source('supabase/migrations/20260810151000_automotive_search_projection.sql'),
     source('supabase/migrations/20260810154000_automotive_model_seller_search.sql'),
@@ -86,11 +87,18 @@ test('vehicle discovery exposes globally useful independent facets through a min
     assert.match(filters, new RegExp(field));
   }
   assert.match(filters, /Any seller/);
+  assert.match(cards, /listing\.seller_type === 'dealer'/);
+  assert.match(cards, /label: 'Dealer'/);
+  assert.match(cards, /listing\.seller_type === 'private'/);
+  assert.match(cards, /label: 'Private seller'/);
+  assert.doesNotMatch(cards, /verified seller|trust score|seller rating/i);
   assert.match(repository, /public_listing_search_card_page_v3/);
   assert.match(repository, /p_model: request\.model/);
   assert.match(repository, /p_seller_type: request\.sellerType/);
   assert.match(baseMigration, /attributes -> 'values' ->> 'body_type'/);
   assert.match(baseMigration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
+  assert.match(v3Migration, /idx_car_details_automotive_model_trgm/);
+  assert.match(v3Migration, /model gin_trgm_ops/);
   assert.match(v3Migration, /normalized_model/);
   assert.match(v3Migration, /normalized_seller_type not in \('', 'dealer', 'private'\)/);
   assert.match(v3Migration, /profile\.business_type = 'car_dealership'/);
@@ -98,12 +106,14 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(v3Migration, /approval\.category = 'car'/);
   assert.match(v3Migration, /approval\.status = 'approved'/);
   assert.match(v3Migration, /listing\.car_model ilike/);
-  assert.match(v3Migration, /case when listing\.is_dealer then 'dealer' else 'private' end/);
+  assert.match(v3Migration, /when listing\.kind::text <> 'car' then null/);
+  assert.match(v3Migration, /when listing\.is_dealer then 'dealer'/);
   assert.match(v3Migration, /listing\.has_current_peek/);
   assert.match(previewService, /previewSellerType/);
   assert.match(previewService, /request\.model/);
   assert.match(previewService, /request\.sellerType/);
   assert.match(rollback, /drop function if exists public\.public_listing_search_card_page_v3/);
+  assert.match(rollback, /drop index if exists public\.idx_car_details_automotive_model_trgm/);
   const privateReturnStart = v3Migration.indexOf('returns table (');
   const privateReturnEnd = v3Migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
