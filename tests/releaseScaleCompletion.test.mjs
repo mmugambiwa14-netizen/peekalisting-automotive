@@ -60,7 +60,7 @@ test('active public search uses bounded currency-safe thin card keyset pages and
   assert.match(searchCardMigration, /jsonb_build_array\(listing\.photos -> 0\)/);
   assert.match(searchV2Migration, /idx_listings_public_currency_price_asc/);
   assert.match(searchV2Migration, /idx_listings_public_currency_price_desc/);
-  assert.match(searchRepository, /public_listing_search_card_page_v1/);
+  assert.match(searchRepository, /public_listing_search_card_page_v3/);
   assert.match(searchService, /normalizePublicSearchPageRequest/);
   assert.match(searchService, /nextCursor/);
   assert.match(searchPage, /useInfiniteQuery/);
