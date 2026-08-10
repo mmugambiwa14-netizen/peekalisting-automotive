@@ -54,7 +54,7 @@ Deno.serve(async (request: Request) => {
 
   if (identityError) {
     console.error("Account identity anonymisation failed", { userId: user.id, error: identityError.message });
-    return json({ error: "Your profile was removed, but sign-in closure needs support. Please contact FindIt support.", deletion_started: true }, 500);
+    return json({ error: "Your profile was removed, but sign-in closure needs support. Please contact PeekaListing support.", deletion_started: true }, 500);
   }
 
   return json({ deleted: true, completed_at: prepared?.completed_at || new Date().toISOString(), retained_records_anonymised: true });
