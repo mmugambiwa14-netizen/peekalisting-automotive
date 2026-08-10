@@ -1,176 +1,147 @@
-# Supabase Setup
+# Supabase setup
 
-## Verified hosted checkpoint — 2026-07-26
+PeekaListing Automotive requires its own Supabase project. The original FindIt projects are reference environments only and must not be used as the automotive staging or production backend.
 
-Project `bwgklpxoetrrkutottdb` (`FindIt Staging`, `eu-west-2`, Postgres 17) is
-linked. Migrations `0001`–`0030`, two private buckets and all four Edge
-Functions are deployed. Auth uses a minimum 10-character mixed-case/digit
-password policy, eight-character email OTPs, confirmation enabled, and exact
-local/intended-staging redirect URLs. Hosted Auth, RLS, marketplace, admin,
-business/dealer, messaging, notifications, storage, worker and search-scale
-smokes pass.
+## Automotive staging target
 
-Production must use a separate project and repeat the full setup/acceptance
-sequence. Never copy staging service or worker secrets into production.
+Create a dedicated project named `PeekaListing Automotive Staging` in the approved Supabase organization. The current repository deployment boundary expects its project ref through `PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF` and rejects both inherited FindIt project refs.
 
-Status: local verification plus an accepted empty hosted staging checkpoint. It is not
-a production provisioning guide. Last reviewed: 2026-07-26.
+Use `eu-west-2` unless an explicit infrastructure decision changes the region. This matches the existing hosted baseline while keeping the new database independent.
 
-## Prerequisites
+## Local development
 
-- Supported Node.js/npm version from the project tooling.
-- Docker Desktop running.
-- Supabase CLI installed and authenticated only when operating a remote
-  project.
-- A local `.env.local` containing non-secret public browser values described
-  in `ENVIRONMENT_VARIABLES.md`. Never commit environment files or secrets.
+Requirements:
 
-## Local setup
+- Node.js 24+
+- npm
+- Docker Desktop
+- Supabase CLI
 
 From the repository root:
 
-```powershell
-npm.cmd ci
+```bash
+npm ci --ignore-scripts
 supabase start
 supabase db reset --local --no-seed
-supabase db lint --local
-supabase test db
+npm run validate:env
+npm run dev
 ```
 
-The current local configuration uses ports in the `55320`-`55329` range to
-avoid the unrelated default-port project that may be running on a developer
-machine. Obtain the local API URL and anon key from `supabase status --output
-json`, place them in `.env.local`, then run:
+Use the local public Supabase URL and publishable/anon key reported by `supabase status`. Never place a service-role, secret, worker, VAPID private, SMTP or provider secret in a browser `VITE_*` variable.
 
-```powershell
-npm.cmd run validate:env
-npm.cmd run dev
-```
+## Database provisioning
 
-To run the repeatable local signup, confirmation, profile-trigger,
-login/logout, recovery, and password-replacement smoke, set the local
-publishable key for the current process and run:
+A fresh automotive project must receive the repository migration chain in order. Do not cherry-pick only the newest automotive migrations onto an empty database because they depend on the established marketplace, moderation, notification, business, media and Peek schemas.
 
-```powershell
-$env:FINDIT_SUPABASE_ANON_KEY='your-local-publishable-key'
-npm.cmd run test:auth-local
-```
+The automotive tail of the chain includes:
 
-The smoke creates a synthetic local account. Run the clean reset again after
-capturing test evidence when a zero-row local baseline is required.
+- `20260808000000_automotive_launch_core.sql`
+- `20260810150000_automotive_open_vehicle_submission.sql`
+- `20260810151000_automotive_search_projection.sql`
+- `20260810152000_automotive_service_taxonomy.sql`
+- `20260810153000_automotive_dealer_directory.sql`
+- `20260810154000_automotive_model_seller_search.sql`
+- `20260810155000_automotive_public_dealer_profile_gate.sql`
 
-The Phase 3 owner-listing CRUD and active V1 admin smokes additionally need the
-local secret key.
-It refuses any non-local Supabase URL, creates and removes its own disposable
-identity, and never prints credentials:
+The full chain also includes later hardening such as `20260810052000_unified_release_gate_repairs.sql`, which moves authenticated Web Push preference implementations behind the private schema and preserves review-before-takedown report semantics.
 
-```powershell
-$env:FINDIT_SUPABASE_ANON_KEY='your-local-publishable-key'
-$env:FINDIT_SUPABASE_SECRET_KEY='your-local-secret-key'
-npm.cmd run test:owner-listings-local
-npm.cmd run test:services-local
-npm.cmd run test:admin-local
-npm.cmd run test:messaging-local
-npm.cmd run test:notifications-local
-npm.cmd run test:listing-expiry-local
-npm.cmd run test:listing-creation-local
-npm.cmd run test:media-lifecycle-local
-```
+After migration, run the database/RLS checks and Supabase security advisor before enabling public traffic.
 
-Do not print, commit, or paste generated keys into documentation.
+## Core storage and Edge Functions
 
-## Hosted staging Auth smoke
+The first automotive staging acceptance pass needs the existing private storage/media path rather than a parallel upload system.
 
-`npm run test:auth-hosted` is intentionally separate from the local Mailpit
-flow. It requires an explicit staging opt-in and exact project-ref match,
-creates one confirmed synthetic account, verifies the profile trigger, password
-login, own-profile RLS, anonymous denial and logout, then removes the Auth and
-profile fixtures. Provide all values only for the current process:
+Core functions to deploy for the basic account, vehicle, dealer and automotive-service journeys:
 
-```powershell
-$env:FINDIT_ALLOW_HOSTED_SMOKE='staging'
-$env:FINDIT_EXPECTED_PROJECT_REF='your-approved-project-ref'
-$env:FINDIT_SUPABASE_URL='https://your-approved-project-ref.supabase.co'
-$env:FINDIT_SUPABASE_ANON_KEY='your-hosted-publishable-key'
-$env:FINDIT_SUPABASE_SECRET_KEY='your-hosted-secret-key'
-npm.cmd run test:auth-hosted
-```
+- `listing-image-upload`
+- `marketplace-image-upload`
+- `delete-account`
 
-The script does not test email delivery, recovery links, OAuth, browser
-redirects, refresh/revocation across devices, or existing-user migration.
+Supabase provides the project URL and project keys to Edge Functions. The upload functions also require the allowed browser origin to include:
 
-`npm run test:listing-creation-hosted` reuses the listing smoke only after the
-same explicit staging opt-in and exact project-ref match. It creates disposable
-owner/admin/stranger identities, exercises hostile and valid hosted upload,
-submission, moderation, signed download and atomic image replacement, then
-removes its database, Auth and Storage fixtures. Use the same process-only
-variables shown above.
+`https://cars-staging.peekalisting.com`
 
-## Intentional local limitations
+Set the existing compatibility variable:
 
-`supabase/config.toml` enables Storage and the Edge runtime for the approved V1
-image classes. Realtime and Analytics remain disabled. The `listing-images`
-and `marketplace-images` buckets are private, capped at 5 MiB and restricted
-to JPEG/PNG/WebP. `listing-image-upload` and `marketplace-image-upload` verify
-JWTs and use local-only browser origins unless `FINDIT_ALLOWED_ORIGINS` is
-supplied to the function runtime. `media-lifecycle-cleanup` and
-`listing-expiry-worker` are internal-only functions: gateway JWT verification
-is disabled so both legacy JWT and new opaque Supabase secret keys work, but
-each function constant-time compares the bearer credential with its dedicated
-`FINDIT_MEDIA_CLEANUP_WORKER_SECRET` or
-`FINDIT_LISTING_EXPIRY_WORKER_SECRET` before claiming work. Local development
-falls back to the local admin key only when the dedicated variable is absent.
-The hosted scheduler credential must never be the Supabase database admin key.
-Never expose or call either worker from a browser.
-A hosted scheduler must invoke them at a
-documented interval, keep the credential in a secret manager/Vault, and alert
-on expired backlog, stale claims and retries. Do not mistake this local configuration for
-a hosted deployment, advanced media processing, or support for retained/
-deferred document and attachment classes.
+`FINDIT_ALLOWED_ORIGINS=https://cars-staging.peekalisting.com`
 
-## Remote/staging prerequisites
+The `FINDIT_` prefix is retained for runtime compatibility; it does not mean the function should target a FindIt project.
 
-Before using a remote Supabase project, record the project owner, region,
-Postgres version, redirect URLs, SMTP/OAuth/SMS providers, RLS acceptance
-matrix, backup/PITR configuration, and immutable migration/data manifests.
-Apply migrations only after the upgrade, rollback, and reconciliation gates in
-`DEPLOYMENT_RUNBOOK.md` are met.
+## Notifications and email
 
-The current empty staging checkpoint is `FindIt Staging`
-(`bwgklpxoetrrkutottdb`, `eu-west-2`, Postgres 17). Migrations `0001`–`0030`
-and all four Edge Functions are deployed. Hosted `public,storage` schema lint,
-public REST, anonymous function denial, dedicated maintenance-worker
-authentication and the guarded Auth smoke pass. `supabase test db --linked`
-currently stops before assertions because the managed CLI login role lacks
-`USAGE` on the `extensions` schema containing pgTAP; local pgTAP remains the
-authoritative 258-assertion matrix until a supported hosted runner credential
-or provider fix is available.
+The in-app notification domain is database-backed. Web Push and transactional email are additional runtime layers and should be enabled only after their secrets/providers are configured.
 
-Google and Apple provider setup is documented in
-[`OAUTH_SETUP.md`](OAUTH_SETUP.md). Do not enable a frontend OAuth flag merely
-because the Supabase setting was saved: the provider console callback, hosted
-setting, complete browser round trip, profile creation and account-state denial
-must all pass first.
+Web Push dispatch requires:
 
-## Verification boundary
+- `PUSH_DISPATCH_TOKEN`
+- `WEB_PUSH_PUBLIC_KEY`
+- `WEB_PUSH_PRIVATE_KEY`
+- `WEB_PUSH_SUBJECT` (for example `mailto:support@peekalisting.com`)
 
-The local suite previously proved clean application through migration `0029`,
-schema lint, 258 RLS/database assertions, local reconciliation, and Auth/owner/service/
-admin/business/messaging/notification/listing-upload API smokes. The listing,
-service-photo and business-logo smokes exercise real Edge and Storage HTTP
-paths through signed exact-byte downloads; product/service smokes also replace
-attached media and verify detached-object privacy and cleanup. The lifecycle
-claim/finalize/retry protocol, worker source contract and real local Edge/
-Storage HTTP smoke pass, including browser-key denial, two-bucket deletion,
-ledger finalization and an idempotent repeat run. Migration `0030` has been
-applied to hosted staging, the linked schema lint is clean, and no migration is
-pending; its clean local replay remains to be repeated after the local Docker
-runtime is healthy. The listing-expiry Edge smoke
-also proves browser/mixed-key denial, trusted notification creation, a safe
-internal link and repeat-run idempotency. Targeted Chromium verifies recovery,
-owner listings, public seller, V1 service, active V1 admin and business/dealer
-workflows through the prior checkpoint; listing creation, messaging and
-notification Chromium remain blocked because no in-app browser instance is
-available. It does not prove a production upgrade, provider-backed restore,
-hosted Storage/Edge deployment, SMTP/OAuth delivery, complete browser/device
-coverage, or deployment workflow.
+The browser receives only the matching public VAPID key through `VITE_WEB_PUSH_PUBLIC_KEY`.
+
+Transactional email dispatch requires:
+
+- `EMAIL_DISPATCH_TOKEN`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `FINDIT_APP_URL=https://cars-staging.peekalisting.com`
+
+Custom Supabase Auth SMTP is configured separately from the transactional application-email worker.
+
+## Peeks
+
+Peeks are a core product capability but have a larger runtime footprint. Do not enable `VITE_FEATURE_TOURS` merely because the schema exists.
+
+Before enabling Peeks on automotive staging:
+
+1. Deploy the tour upload, completion, feed, playback, processing, lifecycle, cache and observability functions required by the existing Peek architecture.
+2. Set `TOURS_BACKEND_ENABLED=true` only after the corresponding workers and worker credentials are ready.
+3. Add `https://cars-staging.peekalisting.com` to `FINDIT_ALLOWED_ORIGINS`.
+4. Run the car-only hosted Peek verification from `scripts/verify-automotive-staging.mjs`.
+5. Validate at least one real car Peek/Peek Request journey end to end before public launch.
+
+Do not copy production worker credentials into staging.
+
+## Hosted Auth requirements
+
+Before public launch, configure and verify the automotive Supabase project itself rather than relying on local `supabase/config.toml` defaults.
+
+Required baseline:
+
+- canonical site URL: `https://cars-staging.peekalisting.com` for staging
+- only intentional redirect URLs
+- email confirmation enabled
+- minimum password policy appropriate for production
+- leaked-password protection enabled
+- MFA policy reviewed and enabled where required, particularly for administrators
+- anonymous sign-in disabled
+- phone sign-up disabled unless deliberately introduced
+- CAPTCHA/bot protection configured for public auth surfaces
+- custom SMTP configured and tested
+- Google OAuth enabled only after the provider console callback and complete browser round trip pass
+- Apple remains disabled until separately implemented and verified
+
+Admin accounts should receive stronger authentication requirements than ordinary marketplace users.
+
+## Staging verification
+
+The active deployment workflow is `.github/workflows/automotive-staging.yml` and the hosted verifier is `scripts/verify-automotive-staging.mjs`.
+
+The verifier proves:
+
+- the hosted SPA/PWA and security headers
+- the configured project is the guarded automotive Supabase project
+- Cars V3 public search is callable
+- public dealer discovery is callable
+- returned car seller identity is `dealer` or `private`
+- Google OAuth only when enabled
+- car Peek feed only when Peeks are enabled
+
+A new clean staging database is allowed to contain zero listings or dealers. Inventory seeding belongs to the subsequent acceptance phase.
+
+## Production boundary
+
+Production requires a separate Supabase project and separate secrets. Do not promote by changing the automotive staging project into production or by pointing the automotive client at `FindIt Marketplace`.
+
+Promote only after migrations, RLS/security advisor, Auth, Storage, Edge Functions, vehicle submission/moderation, dealer onboarding, search, messaging, reporting, Peeks, notifications and account-management journeys pass against automotive staging.
