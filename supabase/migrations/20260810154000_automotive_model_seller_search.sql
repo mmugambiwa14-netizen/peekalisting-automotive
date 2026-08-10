@@ -1,7 +1,11 @@
 begin;
 
-create index if not exists idx_business_category_approvals_automotive_directory
-  on public.business_category_approvals (user_id, category, status);
+-- Model is free text and buyers commonly search partial names such as "Hilux"
+-- or "CX-5". pg_trgm is already part of the schema foundation, so index the
+-- actual new predicate instead of duplicating the existing approval key index.
+create index if not exists idx_car_details_automotive_model_trgm
+  on public.car_details using gin (model gin_trgm_ops)
+  where model is not null;
 
 create or replace function private.public_listing_search_card_page_v3(
   p_kind text,
@@ -161,22 +165,25 @@ begin
       machinery.condition as machinery_condition,
       machinery.year as machinery_year,
       machinery.usage_hours,
-      exists (
-        select 1
-        from public.business_profiles profile
-        join public.users account on account.id = profile.user_id
-        where profile.user_id = listing.seller_id
-          and account.status = 'active'::public.user_status
-          and profile.business_type = 'car_dealership'::public.business_type
-          and profile.profile_type = 'dealer'
-          and profile.verified = true
-          and exists (
-            select 1
-            from public.business_category_approvals approval
-            where approval.user_id = profile.user_id
-              and approval.category = 'car'
-              and approval.status = 'approved'
-          )
+      (
+        listing.kind::text = 'car'
+        and exists (
+          select 1
+          from public.business_profiles profile
+          join public.users account on account.id = profile.user_id
+          where profile.user_id = listing.seller_id
+            and account.status = 'active'::public.user_status
+            and profile.business_type = 'car_dealership'::public.business_type
+            and profile.profile_type = 'dealer'
+            and profile.verified = true
+            and exists (
+              select 1
+              from public.business_category_approvals approval
+              where approval.user_id = profile.user_id
+                and approval.category = 'car'
+                and approval.status = 'approved'
+            )
+        )
       ) as is_dealer,
       exists (
         select 1
@@ -202,7 +209,11 @@ begin
     listing.kind::text,
     listing.seller_id,
     listing.seller_name,
-    case when listing.is_dealer then 'dealer' else 'private' end,
+    case
+      when listing.kind::text <> 'car' then null
+      when listing.is_dealer then 'dealer'
+      else 'private'
+    end,
     listing.has_contact_phone,
     listing.has_contact_whatsapp,
     listing.has_contact_email,
@@ -338,6 +349,6 @@ grant execute on function public.public_listing_search_card_page_v3(
 
 comment on function public.public_listing_search_card_page_v3(
   text,text,text,text,text,text,numeric,numeric,integer,text,text,text,text,text,text,text,text,text,integer,integer,integer,boolean,text,text,uuid,integer
-) is 'Automotive marketplace search V3: adds model matching and authoritative approved-dealer versus private-seller filtering while preserving bounded public projection and keyset pagination.';
+) is 'Automotive marketplace search V3: adds indexed model matching and authoritative approved-dealer versus private-seller filtering while preserving bounded public projection and keyset pagination.';
 
 commit;
