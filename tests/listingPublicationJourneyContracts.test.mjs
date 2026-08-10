@@ -139,10 +139,11 @@ test('listing journey has executable database and hosted certification assets', 
   const runner = await read('scripts/certify-listing-publication-journey.mjs');
   const rollback = await read('supabase/rollback/20260810150000_automotive_open_vehicle_submission.rollback.sql');
   const v2Rollback = await read('supabase/rollback/20260808081300_listing_schema_v2_submission.rollback.sql');
-  assert.match(pgTap, /publish immediately without human review/);
-  assert.match(pgTap, /pause a live listing/);
-  assert.match(pgTap, /relist an unavailable listing/);
-  assert.match(pgTap, /permanently delete/);
+  assert.match(pgTap, /validated automotive submissions remain pending until moderation/);
+  assert.match(pgTap, /administrator can approve a pending vehicle/);
+  assert.match(pgTap, /owner can pause an approved live vehicle/);
+  assert.match(pgTap, /owner can resubmit an unavailable vehicle/);
+  assert.match(pgTap, /permanently delete their vehicle/);
   assert.match(automotivePgTap, /private vehicle remains pending until moderation approves publication/);
   assert.match(automotivePgTap, /private seller cannot insert an already-public vehicle/);
   assert.match(v2PgTap, /exact richer fuel value/);
