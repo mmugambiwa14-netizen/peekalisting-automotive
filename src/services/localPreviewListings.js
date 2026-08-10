@@ -144,6 +144,7 @@ function createProperty(index) {
     photos: [localAsset('findit-property-preview.jpg')],
     category: template.category,
     listing_type: rent ? 'rent' : 'sale',
+    attributes: null,
     car_details: null,
     property_details: {
       property_type: template.category,
@@ -214,6 +215,7 @@ function createMachinery(index) {
     photos: [localAsset('findit-machinery-preview.jpg')],
     category: template.category,
     listing_type: 'sale',
+    attributes: null,
     car_details: null,
     property_details: null,
     machinery_details: {
