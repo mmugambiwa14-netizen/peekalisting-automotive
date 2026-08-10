@@ -51,9 +51,8 @@ select extensions.ok(not public.can_publish_in_category('property'), 'private se
 select extensions.ok(not public.can_publish_in_category('service'), 'private seller cannot use the open vehicle rule for Services');
 reset role;
 
--- The authoritative table trigger permits a legitimate private vehicle insert.
--- Public visibility is still controlled by the separate listing moderation
--- lifecycle; the normal submission RPC creates new adverts in pending_review.
+-- A legitimate private automotive insert must enter pending_review and the
+-- inherited auto-publication trigger must leave it there.
 select extensions.lives_ok(
   $$insert into public.listings (
       id, kind, seller_id, seller_name, title, description, price, currency,
@@ -63,9 +62,32 @@ select extensions.lives_ok(
       '41000000-0000-4000-8000-000000000002', 'Private Seller',
       'Private seller vehicle',
       'A complete certification listing proving that an active private owner can cross the vehicle submission boundary.',
-      15000, 'USD', 15000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'draft'
+      15000, 'USD', 15000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'pending_review'
     )$$,
-  'active private seller vehicle insert succeeds'
+  'active private seller vehicle submission succeeds'
+);
+select extensions.is(
+  (select status::text from public.listings where id = '41000000-0000-4000-8000-000000000401'),
+  'pending_review',
+  'private vehicle remains pending until moderation approves publication'
+);
+
+-- Direct table writes cannot use the open seller rule as a self-publication
+-- channel, even when the caller otherwise owns the vehicle row.
+select extensions.throws_ok(
+  $$insert into public.listings (
+      id, kind, seller_id, seller_name, title, description, price, currency,
+      native_price, native_currency, photos, category, listing_type, status
+    ) values (
+      '41000000-0000-4000-8000-000000000405', 'car',
+      '41000000-0000-4000-8000-000000000002', 'Private Seller',
+      'Attempted direct-public vehicle',
+      'A certification row proving that open vehicle submission cannot be converted into direct public publication.',
+      15100, 'USD', 15100, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'available'
+    )$$,
+  '42501',
+  'Vehicle submissions must enter review before publication',
+  'private seller cannot insert an already-public vehicle'
 );
 
 select extensions.throws_ok(
@@ -94,7 +116,7 @@ select extensions.throws_ok(
       '41000000-0000-4000-8000-000000000002', 'Spoofed Seller',
       'Spoofed vehicle',
       'A complete certification listing that must fail because the authenticated actor is impersonating another seller.',
-      14000, 'USD', 14000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'draft'
+      14000, 'USD', 14000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'pending_review'
     )$$,
   '42501',
   'Listing publisher identity mismatch',
@@ -133,9 +155,9 @@ select extensions.throws_ok(
   'unapproved Services publisher insert is rejected'
 );
 
--- Suspending dealership Cars approval removes dealership capability but does
--- not stop the same active person from using the ordinary private-seller
--- vehicle submission channel.
+-- Suspending Cars business approval removes the dealership capability but does
+-- not stop the same active person from using the ordinary private-seller car
+-- submission channel. The resulting advert still waits for moderation.
 select set_config('request.jwt.claim.sub', '41000000-0000-4000-8000-000000000001', true);
 update public.business_category_approvals
 set status = 'suspended', reviewer_message = 'Certification suspension', updated_at = clock_timestamp()
@@ -168,9 +190,14 @@ select extensions.lives_ok(
       '41000000-0000-4000-8000-000000000001', 'Approved Dealer',
       'Vehicle after dealer suspension',
       'A complete certification listing proving private automotive submission remains independent from dealer-category status.',
-      13000, 'USD', 13000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'draft'
+      13000, 'USD', 13000, 'USD', '[]'::jsonb, 'cars_sale', 'sale', 'pending_review'
     )$$,
   'active owner may still submit a vehicle after dealership capability is suspended'
+);
+select extensions.is(
+  (select status::text from public.listings where id = '41000000-0000-4000-8000-000000000404'),
+  'pending_review',
+  'vehicle submitted after dealership suspension still waits for moderation'
 );
 
 select extensions.is(
