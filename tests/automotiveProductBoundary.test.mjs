@@ -61,6 +61,8 @@ test('private vehicle submission remains moderated and other domains remain cura
   assert.match(launchMigration, /account\.status = 'active'/);
   assert.match(launchMigration, /business_category_approvals/);
   assert.match(launchMigration, /pending_review/);
+  assert.match(launchMigration, /Vehicle submissions must enter review before publication/);
+  assert.match(launchMigration, /when listing_row\.kind::text = 'car' then 'pending_review'/);
   assert.match(success, /Vehicle submitted for review/);
   assert.match(success, /Pending review/);
   assert.doesNotMatch(success, />Your listing is live</);
@@ -85,7 +87,9 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(migration, /attributes -> 'values' ->> 'body_type'/);
   assert.match(migration, /attributes -> 'values' ->> 'drivetrain'/);
   assert.match(migration, /attributes -> 'values' ->> 'import_status'/);
-  assert.match(migration, /listing_tour_slots/);
+  assert.match(migration, /join public\.listing_tours tour on tour\.id = slot\.current_tour_id/);
+  assert.match(migration, /tour\.moderation_status = 'approved'/);
+  assert.match(migration, /tour\.published_at is not null/);
   assert.match(migration, /p_max_mileage/);
   assert.match(migration, /kind = 'car'::public\.listing_kind/);
   assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
@@ -115,10 +119,11 @@ test('automotive Peek surfaces ask for observable evidence instead of becoming a
 });
 
 test('dealers and automotive services reuse existing systems with current approval boundaries', async () => {
-  const [dealersRepository, dealersPage, dealerMigration, servicesPage, servicesRepository, serviceTaxonomy, serviceRollback] = await Promise.all([
+  const [dealersRepository, dealersPage, dealerMigration, dealerRollback, servicesPage, servicesRepository, serviceTaxonomy, serviceRollback] = await Promise.all([
     source('src/repositories/dealersRepository.js'),
     source('src/pages/Dealers.jsx'),
     source('supabase/migrations/20260810153000_automotive_dealer_directory.sql'),
+    source('supabase/rollback/20260810153000_automotive_dealer_directory.rollback.sql'),
     source('src/pages/Services.jsx'),
     source('src/repositories/servicesRepository.js'),
     source('supabase/migrations/20260810152000_automotive_service_taxonomy.sql'),
@@ -126,8 +131,15 @@ test('dealers and automotive services reuse existing systems with current approv
   ]);
 
   assert.match(dealersRepository, /public_automotive_dealers_page/);
+  assert.match(dealerMigration, /join public\.users account on account\.id = profile\.user_id/);
+  assert.match(dealerMigration, /account\.status = 'active'/);
+  assert.match(dealerMigration, /profile\.business_type = 'car_dealership'/);
+  assert.match(dealerMigration, /profile\.profile_type = 'dealer'/);
+  assert.match(dealerMigration, /profile\.verified = true/);
   assert.match(dealerMigration, /approval\.category = 'car'/);
   assert.match(dealerMigration, /approval\.status = 'approved'/);
+  assert.match(dealerRollback, /drop function if exists public\.public_automotive_dealers_page/);
+  assert.match(dealerRollback, /drop function if exists private\.public_automotive_dealers_page/);
   assert.match(dealersPage, /View dealer inventory/);
   assert.match(servicesPage, /const AUTOMOTIVE_SERVICE_DOMAIN = 'mechanic'/);
   assert.match(servicesRepository, /contains\('subcategories', \[request\.specialization\]\)/);
