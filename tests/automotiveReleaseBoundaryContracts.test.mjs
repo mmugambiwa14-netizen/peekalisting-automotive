@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [migration, verifier, workflow] = await Promise.all([
+const [migration, authenticatedRpcClosure, verifier, workflow] = await Promise.all([
   readFile(new URL('../supabase/migrations/20260811050000_automotive_release_boundary_attestation.sql', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/migrations/20260811051000_authenticated_rpc_anon_closure.sql', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/verify-automotive-release-boundary.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../.github/workflows/automotive-staging.yml', import.meta.url), 'utf8'),
 ]);
@@ -24,6 +25,28 @@ test('hosted release attestation covers the critical automotive security boundar
   assert.match(migration, /web_push_notification_preferences/);
   assert.match(migration, /get_public_seller_profile\(text\).*is null/s);
   assert.match(migration, /security invoker/i);
+});
+
+test('hosted release attestation rejects anonymous access to authenticated-only RPCs', () => {
+  for (const rpcName of [
+    'create_peek_request',
+    'decline_peek_request',
+    'merge_peek_request',
+    'support_peek_request',
+    'withdraw_peek_request_support',
+    'reveal_listing_contact',
+    'reveal_service_contact',
+    'register_web_push_subscription',
+    'prepare_own_account_deletion',
+  ]) {
+    assert.match(authenticatedRpcClosure, new RegExp(`'${rpcName}'`));
+  }
+
+  assert.match(authenticatedRpcClosure, /n\.nspname in \('public','private'\)/);
+  assert.match(authenticatedRpcClosure, /revoke execute on function %s from public, anon/i);
+  assert.match(authenticatedRpcClosure, /has_function_privilege\('anon', function_record\.oid, 'EXECUTE'\)/);
+  assert.match(authenticatedRpcClosure, /anonymous EXECUTE remains/i);
+  assert.match(authenticatedRpcClosure, /automotive_release_boundary_ready/);
 });
 
 test('hosted verifier requires a true database release attestation from the isolated project', () => {
