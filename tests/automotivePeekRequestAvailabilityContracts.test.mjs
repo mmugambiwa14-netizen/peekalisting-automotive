@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [service, sellerQueue, workflow, uploader, databaseInterlock] = await Promise.all([
+const [service, threads, sellerQueue, workflow, uploader, databaseInterlock] = await Promise.all([
   readFile(new URL('../src/services/peekThreadsService.js', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/peekThreads/PeekThreadsSection.jsx', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/peekThreads/SellerPeekRequestsQueueLive.jsx', import.meta.url), 'utf8'),
   readFile(new URL('../.github/workflows/automotive-staging.yml', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/tours/TourUploader.jsx', import.meta.url), 'utf8'),
@@ -18,6 +19,17 @@ test('automotive does not create new unfulfillable Peek demand while Response Pe
   assert.match(service, /createPeekRequest\(input\)[\s\S]*requireResponsePeekCapture\(\)/);
   assert.match(service, /supportPeekRequest\(requestId\)[\s\S]*requireResponsePeekCapture\(\)/);
   assert.match(service, /acceptPeekRequest\(requestId\)[\s\S]*requireResponsePeekCapture\(\)/);
+});
+
+test('buyer Peek threads become read-only instead of advertising dead response actions', () => {
+  assert.match(threads, /const requestsWritable = featureFlags\.tours/);
+  assert.match(threads, /Peek Requests are temporarily read-only while Response Peek capture is being prepared for Automotive/);
+  assert.match(threads, /!isOwner && requestsWritable[\s\S]*Request a Peek/);
+  assert.match(threads, /requestsWritable && composerOpen && !isOwner/);
+  assert.match(threads, /Response Peek capture is being prepared/);
+  assert.match(threads, /New Peek Requests will open after the response pipeline passes Automotive staging acceptance/);
+  assert.match(threads, /\(requestsWritable \|\| item\.supportedByMe\)/);
+  assert.match(threads, /isOwner && requestsWritable[\s\S]*Record response/);
 });
 
 test('database rejects direct Peek demand writes while the Tours backend control is disabled', () => {
