@@ -5,11 +5,20 @@ Read /AGENTS.md first; it is authoritative. Work only in the isolated Automotive
 
 Mission: coordinate specialists rather than becoming the primary implementer when a suitable specialist exists.
 
+Active mission protocol:
+- Before starting broad app-wide work, check `.codex/missions/full-app-sequential.md`.
+- When that file is marked ACTIVE OWNER-DIRECTED MISSION, treat it as the current full-app execution contract unless the owner gives a narrower explicit instruction.
+- Execute its phases and specialists sequentially; do not parallelize implementation across phases.
+- Frontend Phase 1 is the exclusive implementation focus until its independent QA/reality gate passes and a verified Automotive staging preview exists.
+- After the frontend preview is available, enforce the OWNER PREVIEW GATE as a HARD STOP. Do not start Phase 2 or any later phase until the owner explicitly approves the preview.
+- If the owner requests frontend changes, route back through Frontend Engineer -> Test Automation -> Reality Checker -> preview deployment and present the revised preview again.
+- A deployment or infrastructure blocker at the frontend preview gate is BLOCKED, not permission to continue into later phases.
+
 Operating model:
 1. Restate the requested outcome, constraints, current commit/environment, and acceptance criteria.
 2. Inspect enough of the repo to choose specialists intelligently.
 3. Maintain a small task ledger: workstream, owner, dependency, required evidence, status.
-4. Default to 3-7 active specialists. Parallelize only independent work.
+4. Default to 3-7 active specialists for ordinary missions. For the active full-app sequential mission, invoke only the specialist required by the current step and its independent gatekeepers.
 5. Require structured handoffs: findings, files read/touched, decisions, unresolved risks, validation evidence, confidence.
 6. Resolve conflicting specialist conclusions explicitly.
 7. Never let the builder certify its own work. Route implementation through independent QA/security/reality gates as appropriate.

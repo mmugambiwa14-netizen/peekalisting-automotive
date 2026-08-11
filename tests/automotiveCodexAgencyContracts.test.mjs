@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 
 const agentsDir = new URL('../.codex/agents/', import.meta.url);
+const missionUrl = new URL('../.codex/missions/full-app-sequential.md', import.meta.url);
 
 async function agentSource(name) {
   return readFile(new URL(name, agentsDir), 'utf8');
@@ -45,4 +46,29 @@ test('orchestrator prevents builder self-certification and reality checker gates
   assert.match(reality, /PASS:/);
   assert.match(reality, /NEEDS WORK:/);
   assert.match(reality, /BLOCKED:/);
+});
+
+test('full-app mission is sequential and hard-stops for owner frontend preview approval', async () => {
+  const [orchestrator, mission] = await Promise.all([
+    agentSource('peekalisting-orchestrator.toml'),
+    readFile(missionUrl, 'utf8'),
+  ]);
+
+  assert.match(mission, /Status: ACTIVE OWNER-DIRECTED MISSION/);
+  assert.match(mission, /Work sequentially\. Do not run implementation workstreams in parallel/);
+  assert.match(mission, /# PHASE 1 — FRONTEND FIRST/);
+  assert.match(mission, /# OWNER PREVIEW GATE — HARD STOP/);
+  assert.match(mission, /DO NOT START PHASE 2 OR ANY LATER PHASE UNTIL THE OWNER EXPLICITLY APPROVES THE FRONTEND PREVIEW/);
+  assert.match(mission, /https:\/\/cars-staging\.peekalisting\.com/);
+  assert.match(mission, /# PHASE 2 — BACKEND AND DOMAIN WORKFLOWS/);
+  assert.match(mission, /# PHASE 9 — PRODUCT AND DEALER LAUNCH READINESS/);
+
+  const frontendIndex = mission.indexOf('# PHASE 1 — FRONTEND FIRST');
+  const previewIndex = mission.indexOf('# OWNER PREVIEW GATE — HARD STOP');
+  const backendIndex = mission.indexOf('# PHASE 2 — BACKEND AND DOMAIN WORKFLOWS');
+  assert.ok(frontendIndex >= 0 && previewIndex > frontendIndex && backendIndex > previewIndex);
+
+  assert.match(orchestrator, /check `\.codex\/missions\/full-app-sequential\.md`/);
+  assert.match(orchestrator, /OWNER PREVIEW GATE as a HARD STOP/);
+  assert.match(orchestrator, /Do not start Phase 2 or any later phase until the owner explicitly approves the preview/);
 });
