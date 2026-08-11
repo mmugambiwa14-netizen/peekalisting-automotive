@@ -24,11 +24,19 @@ import {
   normalizeRequestId,
   normalizeResponseBinding,
 } from '@/domain/peekThreads/writeContracts';
+import { featureFlags } from '@/lib/featureFlags';
 
 function requireValid(result) {
   if (result.ok) return result.value;
   const error = new Error(result.errors[0]?.message || 'Invalid Peek Request');
   error.validationErrors = result.errors;
+  throw error;
+}
+
+function requireResponsePeekCapture() {
+  if (featureFlags.tours) return;
+  const error = new Error('Peek Requests are temporarily unavailable while Response Peek capture is being prepared for Automotive.');
+  error.code = 'PEEK_RESPONSE_CAPTURE_UNAVAILABLE';
   throw error;
 }
 
@@ -85,13 +93,22 @@ export async function getResponsePeekRequestCandidates(tourId, signal) {
 }
 
 export function getResponsePeekPlayback(tourId) { return invokeResponsePeekPlayback(requireValid(normalizeRequestId(tourId))); }
-export function createPeekRequest(input) { return createPeekRequestRow(requireValid(normalizeCreatePeekRequest(input))); }
-export function supportPeekRequest(requestId) { return supportPeekRequestRow(requireValid(normalizeRequestId(requestId))); }
+export function createPeekRequest(input) {
+  requireResponsePeekCapture();
+  return createPeekRequestRow(requireValid(normalizeCreatePeekRequest(input)));
+}
+export function supportPeekRequest(requestId) {
+  requireResponsePeekCapture();
+  return supportPeekRequestRow(requireValid(normalizeRequestId(requestId)));
+}
 export function withdrawPeekRequestSupport(requestId) { return withdrawPeekRequestSupportRow(requireValid(normalizeRequestId(requestId))); }
 export function declinePeekRequest(input) { return declinePeekRequestRow(requireValid(normalizeDeclinePeekRequest(input))); }
 export function mergePeekRequests(input) { return mergePeekRequestRows(requireValid(normalizeMergePeekRequests(input))); }
 export function bindResponsePeek(input) { return bindResponsePeekRows(requireValid(normalizeResponseBinding(input))); }
-export function acceptPeekRequest(requestId) { return acceptPeekRequestRow(requireValid(normalizeRequestId(requestId))); }
+export function acceptPeekRequest(requestId) {
+  requireResponsePeekCapture();
+  return acceptPeekRequestRow(requireValid(normalizeRequestId(requestId)));
+}
 export function cancelPeekRequestFulfilment(requestId, reason = null) {
   const id = requireValid(normalizeRequestId(requestId));
   const normalizedReason = typeof reason === 'string' ? reason.trim().slice(0, 500) || null : null;
