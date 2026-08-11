@@ -46,7 +46,7 @@ function declinePeekRequestWithReason({ requestId, reason }) {
   return declinePeekRequest({ requestId, reason });
 }
 
-export default function PeekThreadsSection({ parentType = 'listing', parentId, listingKind = 'property', ownerId = null, guard }) {
+export default function PeekThreadsSection({ parentType = 'listing', parentId, listingKind = 'property', ownerId = null, guard, readOnly = false }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState(0);
@@ -55,7 +55,7 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
   const [body, setBody] = useState('');
   const [declineTarget, setDeclineTarget] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
-  const requestsWritable = featureFlags.tours;
+  const requestsWritable = featureFlags.tours && !readOnly;
   const filter = FILTERS[activeFilter];
   const queryKey = ['peek-threads', parentType, parentId, filter.value, filter.sort];
 
@@ -73,10 +73,10 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
     getNextPageParam: (page) => page.nextCursor || undefined,
     enabled: Boolean(parentId),
     staleTime: 15_000,
-    refetchInterval: REQUEST_REFRESH_MS,
+    refetchInterval: readOnly ? false : REQUEST_REFRESH_MS,
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: 'always',
-    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: readOnly ? false : 'always',
+    refetchOnReconnect: readOnly ? false : 'always',
   });
 
   const items = useMemo(() => {
@@ -84,8 +84,10 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
     for (const page of threadQuery.data?.pages || []) {
       for (const item of page.items) byId.set(item.requestId, item);
     }
-    return [...byId.values()];
-  }, [threadQuery.data]);
+    return [...byId.values()].filter((item) => (
+      !readOnly || (item.status === 'answered' && item.currentResponseId)
+    ));
+  }, [readOnly, threadQuery.data]);
 
   const duplicate = useMemo(() => body.trim().length >= 8 ? findDuplicateRequest(body, category, items.map((item) => ({
     id: item.requestId,
@@ -143,6 +145,7 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
 
   const isOwner = Boolean(user?.id && ownerId && user.id === ownerId);
   const runGuarded = (action, callback) => {
+    if (readOnly) return;
     if (typeof guard === 'function') {
       guard(action, callback);
       return;
@@ -155,6 +158,7 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
   };
 
   const submitRequest = () => runGuarded('request a Peek', () => {
+    if (readOnly) return;
     if (!requestsWritable) {
       toast.info('Peek Requests will open after Response Peek capture passes Automotive staging acceptance.');
       return;
@@ -196,14 +200,20 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
         : 'Submit request';
 
   return (
-    <section id="peek-threads" className="surface-panel scroll-mt-24 overflow-hidden" aria-labelledby={`peek-threads-${parentId}`}>
+    <section id={readOnly ? 'existing-evidence' : 'peek-threads'} className="surface-panel scroll-mt-24 overflow-hidden" aria-labelledby={`${readOnly ? 'existing-evidence' : 'peek-threads'}-${parentId}`}>
       <div className="border-b border-border p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Visual evidence</p>
-            <h2 id={`peek-threads-${parentId}`} className="mt-1 text-xl font-black tracking-tight">Peek Requests</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{readOnly ? 'Seller evidence' : 'Visual evidence'}</p>
+            {readOnly ? (
+              <h2 id={`existing-evidence-${parentId}`} className="mt-1 text-xl font-black tracking-tight">Existing visual evidence</h2>
+            ) : (
+              <h2 id={`peek-threads-${parentId}`} className="mt-1 text-xl font-black tracking-tight">Peek Requests</h2>
+            )}
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {requestsWritable
+              {readOnly
+                ? 'Existing seller responses are shown as read-only context. They are not an inspection, verification or guarantee of condition.'
+                : requestsWritable
                 ? 'Ask for specific visual proof before you decide. Seller responses become public Peeks that other buyers can also use.'
                 : 'Peek Requests are temporarily read-only while Response Peek capture is being prepared for Automotive. Existing answered requests remain available.'}
             </p>
@@ -251,35 +261,37 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
         )}
       </div>
 
-      <div className="border-b border-border px-3 py-3 sm:px-5"><div className="no-scrollbar flex gap-2 overflow-x-auto" role="tablist" aria-label="Peek Request filters">
+      <div className="border-b border-border px-3 py-3 sm:px-5"><div className="no-scrollbar flex gap-2 overflow-x-auto" role="tablist" aria-label={readOnly ? 'Evidence filters' : 'Peek Request filters'}>
         {FILTERS.map((entry, index) => <button key={`${entry.label}-${index}`} type="button" role="tab" aria-selected={activeFilter === index} onClick={() => setActiveFilter(index)} className={`min-h-10 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${activeFilter === index ? 'bg-primary text-primary-foreground' : 'bg-surface-secondary text-muted-foreground hover:text-foreground'}`}>{entry.label}</button>)}
       </div></div>
 
       <div className="divide-y divide-border">
-        {threadQuery.isLoading && <ListRowsSkeleton rows={4} className="p-3" label="Loading Peek Requests" />}
-        {threadQuery.isError && <div className="p-6 text-center"><p className="text-sm text-destructive">Peek Requests could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => threadQuery.refetch()}>Try again</Button></div>}
+        {threadQuery.isLoading && <ListRowsSkeleton rows={4} className="p-3" label={readOnly ? 'Loading existing evidence' : 'Loading Peek Requests'} />}
+        {threadQuery.isError && <div className="p-6 text-center"><p className="text-sm text-destructive">{readOnly ? 'Existing evidence could not be loaded.' : 'Peek Requests could not be loaded.'}</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => threadQuery.refetch()}>Try again</Button></div>}
         {!threadQuery.isLoading && !threadQuery.isError && items.length === 0 && (
           <div className="p-8 text-center">
             <Eye className="mx-auto h-7 w-7 text-muted-foreground" />
-            <p className="mt-3 font-semibold">{requestsWritable ? 'No Peek Requests here yet' : 'Response Peek capture is being prepared'}</p>
+            <p className="mt-3 font-semibold">{readOnly ? 'No existing visual evidence here yet' : requestsWritable ? 'No Peek Requests here yet' : 'Response Peek capture is being prepared'}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {requestsWritable
+              {readOnly
+                ? 'Seller evidence will appear here only when it is already supported by this listing.'
+                : requestsWritable
                 ? 'Be the first buyer to ask for useful visual evidence.'
                 : 'New Peek Requests will open after the response pipeline passes Automotive staging acceptance.'}
             </p>
           </div>
         )}
-        {items.map((item) => <ThreadCard key={item.requestId} item={item} isOwner={isOwner} requestsWritable={requestsWritable} busy={supportMutation.isPending || declineMutation.isPending} onSupport={() => runGuarded('update your interest in this Peek Request', () => supportMutation.mutate({ requestId: item.requestId, supported: item.supportedByMe }))} onDecline={() => { setDeclineTarget(item); setDeclineReason(''); }} />)}
+        {items.map((item) => <ThreadCard key={item.requestId} item={item} isOwner={isOwner} readOnly={readOnly} requestsWritable={requestsWritable} busy={supportMutation.isPending || declineMutation.isPending} onSupport={() => { if (!readOnly) runGuarded('update your interest in this Peek Request', () => supportMutation.mutate({ requestId: item.requestId, supported: item.supportedByMe })); }} onDecline={() => { if (!readOnly) { setDeclineTarget(item); setDeclineReason(''); } }} />)}
         {!threadQuery.isLoading && !threadQuery.isError && threadQuery.hasNextPage && (
           <div className="flex justify-center p-4">
             <Button type="button" variant="outline" disabled={threadQuery.isFetchingNextPage} onClick={() => threadQuery.fetchNextPage()}>
-              {threadQuery.isFetchingNextPage ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading</> : 'Load more requests'}
+              {threadQuery.isFetchingNextPage ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading</> : readOnly ? 'Load more evidence' : 'Load more requests'}
             </Button>
           </div>
         )}
       </div>
 
-      <AlertDialog open={Boolean(declineTarget)} onOpenChange={(open) => { if (!open && !declineMutation.isPending) { setDeclineTarget(null); setDeclineReason(''); } }}>
+      {!readOnly && <AlertDialog open={Boolean(declineTarget)} onOpenChange={(open) => { if (!open && !declineMutation.isPending) { setDeclineTarget(null); setDeclineReason(''); } }}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Decline this Peek Request?</AlertDialogTitle><AlertDialogDescription>Give buyers a short, useful reason. The request will no longer appear publicly as awaiting your response.</AlertDialogDescription></AlertDialogHeader>
           {declineTarget?.body && <p className="rounded-xl border border-border bg-muted/30 p-3 text-sm font-medium">“{declineTarget.body}”</p>}
@@ -288,12 +300,12 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
           <div className="text-right text-xs text-muted-foreground">{declineReason.trim().length}/280</div>
           <AlertDialogFooter><AlertDialogCancel disabled={declineMutation.isPending}>Cancel</AlertDialogCancel><AlertDialogAction disabled={declineReason.trim().length < 4 || declineMutation.isPending} onClick={(event) => { event.preventDefault(); if (declineTarget) declineMutation.mutate({ requestId: declineTarget.requestId, reason: declineReason.trim() }); }}>{declineMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Declining</> : 'Decline request'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog>}
     </section>
   );
 }
 
-function ThreadCard({ item, isOwner, requestsWritable, busy, onSupport, onDecline }) {
+function ThreadCard({ item, isOwner, readOnly, requestsWritable, busy, onSupport, onDecline }) {
   const answered = item.status === 'answered' && item.currentResponseId;
   return (
     <article className="p-5 sm:p-6">
@@ -307,16 +319,16 @@ function ThreadCard({ item, isOwner, requestsWritable, busy, onSupport, onDeclin
         <p className="mt-2 text-sm font-semibold text-primary">{item.supporterCount === 1 ? '1 buyer wants this' : `${item.supporterCount} buyers want this`}</p>
       </div>
       {answered ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-success/20 bg-success/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Response Peek available</p><p className="mt-1 text-xs text-muted-foreground">Captured {new Date(item.answeredAt || item.createdAt).toLocaleDateString()}</p></div><ResponsePeekWatchButton tourId={item.currentResponseId} title={item.body} /></div>
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-success/20 bg-success/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">{readOnly ? 'Existing seller response' : 'Response Peek available'}</p><p className="mt-1 text-xs text-muted-foreground">Captured {new Date(item.answeredAt || item.createdAt).toLocaleDateString()}</p></div>{!readOnly && <ResponsePeekWatchButton tourId={item.currentResponseId} title={item.body} />}</div>
       ) : (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {!isOwner && !item.requestedByMe && (requestsWritable || item.supportedByMe) && (
+        !readOnly && <div className="mt-4 flex flex-wrap gap-2">
+          {!isOwner && !item.requestedByMe && requestsWritable && (
             <Button type="button" size="sm" variant={item.supportedByMe ? 'secondary' : 'outline'} aria-pressed={item.supportedByMe} disabled={busy} onClick={onSupport}>
               {item.supportedByMe ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <ThumbsUp className="mr-2 h-4 w-4" />}
               {item.supportedByMe ? 'Interested' : 'I want this too'}
             </Button>
           )}
-          {isOwner && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onDecline}><XCircle className="mr-2 h-4 w-4" />Decline</Button>}
+          {isOwner && requestsWritable && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onDecline}><XCircle className="mr-2 h-4 w-4" />Decline</Button>}
           {isOwner && requestsWritable && <Button type="button" size="sm" onClick={() => window.location.assign(`/peek-requests?request=${encodeURIComponent(item.requestId)}`)}><Eye className="mr-2 h-4 w-4" />Record response</Button>}
         </div>
       )}

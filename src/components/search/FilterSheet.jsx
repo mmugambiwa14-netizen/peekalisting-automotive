@@ -97,7 +97,7 @@ export default function FilterSheet({ open, onOpenChange, type, categoryOptions,
             )}
           </div>
 
-          <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-border bg-card/95 px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl"><Button type="button" variant="outline" className="flex-1" onClick={resetDraft}>Reset</Button><Button type="button" className="flex-1" onClick={applyAndClose}>Show vehicles</Button></div>
+          <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-border bg-card/95 px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl"><Button type="button" variant="outline" className="flex-1" onClick={resetDraft}>Reset</Button><Button type="button" className="flex-1" onClick={applyAndClose}>Show results</Button></div>
         </div>
       </SheetContent>
     </Sheet>

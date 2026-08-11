@@ -13,6 +13,7 @@ import ListingMediaViewer from "@/components/listings/ListingMediaViewer";
 import ListingRecommendations from "@/components/listings/ListingRecommendations";
 import ListingSummary from "@/components/listings/ListingSummary";
 import MakeOfferButton from "@/components/listings/MakeOfferButton";
+import PeekThreadsSection from "@/components/peekThreads/PeekThreadsSection";
 import PriceBreakdown from "@/components/listings/PriceBreakdown";
 import ReportListingDialog from "@/components/listings/ReportListingDialog";
 import VariantSelector from "@/components/listings/VariantSelector";
@@ -137,6 +138,11 @@ export default function CarDetail() {
             )}
 
             <div className="mt-6 space-y-5">
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-sm font-semibold text-foreground">Read the evidence in context</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">Captured through PeekaListing when available, seller evidence adds context but does not replace an independent mechanical inspection or ownership check.</p>
+              </div>
+              <PeekThreadsSection parentType="listing" parentId={car.id} listingKind="car" ownerId={car.seller_id} guard={guard} readOnly />
               <VariantSelector variants={car.variants} selectedIndex={selectedVariant} onSelect={setSelectedVariant} />
               <PriceBreakdown listing={car} />
               {car.accepts_offers && <MakeOfferButton listing={car} />}

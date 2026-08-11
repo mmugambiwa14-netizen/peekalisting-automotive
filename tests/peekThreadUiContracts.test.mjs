@@ -19,7 +19,8 @@ test('Peek Requests are integrated into every marketplace detail page', () => {
 
 test('buyer-facing evidence surface uses Peek Request product language', () => {
   assert.match(section, />Peek Requests<\/h2>/);
-  assert.match(section, /aria-label="Peek Request filters"/);
+  assert.match(section, /aria-label=\{readOnly \? 'Evidence filters' : 'Peek Request filters'\}/);
+  assert.match(section, /Existing visual evidence/);
   assert.match(section, /Request a Peek/);
   assert.doesNotMatch(section, />Peek Threads<\/h2>/);
 });
@@ -41,6 +42,7 @@ test('request UI exposes required filters without comment terminology', () => {
 
 test('response cards do not receive raw storage paths or playback URLs', () => {
   assert.doesNotMatch(section, /thumbnail_path|storage_path|playback_url/);
+  assert.match(section, /!readOnly && <ResponsePeekWatchButton/);
 });
 
 test('seller and buyer actions remain role separated', () => {

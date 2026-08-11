@@ -28,7 +28,11 @@ test('buyer Peek threads become read-only instead of advertising dead response a
   assert.match(threads, /requestsWritable && composerOpen && !isOwner/);
   assert.match(threads, /Response Peek capture is being prepared/);
   assert.match(threads, /New Peek Requests will open after the response pipeline passes Automotive staging acceptance/);
-  assert.match(threads, /\(requestsWritable \|\| item\.supportedByMe\)/);
+  assert.match(threads, /const requestsWritable = featureFlags\.tours && !readOnly/);
+  assert.match(threads, /if \(readOnly\) return;/);
+  assert.match(threads, /if \(!readOnly\) runGuarded[\s\S]*supportMutation\.mutate/);
+  assert.match(threads, /!readOnly && <ResponsePeekWatchButton/);
+  assert.match(threads, /!readOnly && <AlertDialog/);
   assert.match(threads, /isOwner && requestsWritable[\s\S]*Record response/);
 });
 

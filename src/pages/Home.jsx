@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { readStoredJson, removeStoredValue, writeStoredJson } from '@/lib/browserStorage';
 import BrandLogo from '@/components/BrandLogo';
 import DiscoverHeader from '@/components/discover/DiscoverHeader';
+import HomePeekRail from '@/components/discover/HomePeekRail';
 import ListingCard from '@/components/listings/ListingCard';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { featureFlags } from '@/lib/featureFlags';
@@ -136,6 +137,8 @@ export default function Home() {
             <div className="rounded-2xl border border-dashed border-border p-6 text-center"><CarFront className="mx-auto h-7 w-7 text-primary" /><p className="mt-2 font-bold">Vehicle inventory is being prepared</p><p className="mt-1 text-sm text-muted-foreground">Be among the first sellers to submit a vehicle for review.</p><Link to="/post" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">Sell a car</Link></div>
           )}
         </section>
+
+        {featureFlags.tours && <HomePeekRail location={location} />}
 
         <section className="mt-9" aria-labelledby="browse-makes-title">
           <div className="mb-4"><p className="findit-overline">Quick discovery</p><h2 id="browse-makes-title" className="fluid-section-title mt-1">Browse by make</h2></div>

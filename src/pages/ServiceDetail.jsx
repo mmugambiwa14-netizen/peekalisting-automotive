@@ -11,6 +11,7 @@ import ListingFeatureItem from "@/components/listings/ListingFeatureItem";
 import ListingMediaActions from "@/components/listings/ListingMediaActions";
 import ListingMediaViewer from "@/components/listings/ListingMediaViewer";
 import ListingSummary from "@/components/listings/ListingSummary";
+import PeekThreadsSection from "@/components/peekThreads/PeekThreadsSection";
 import {
   ListingDescription,
   ListingDetailTabs,
@@ -122,6 +123,7 @@ export default function ServiceDetail() {
               <ListingFeatureItem icon={BadgeCheck} label="Proof" value="Ask provider for examples" />
             </div>
             <div className="mt-6 space-y-5">
+              <PeekThreadsSection parentType="service" parentId={service.id} listingKind="service" ownerId={service.provider_id} guard={guard} readOnly />
               <SafetyPanel>Agree on the scope, timeline and pricing in writing before work begins. PeekaListing does not handle service payments.</SafetyPanel>
             </div>
           </ListingTabSection>
