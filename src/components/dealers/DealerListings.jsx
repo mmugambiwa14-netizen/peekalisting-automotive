@@ -5,23 +5,25 @@ import { cn } from '@/lib/utils';
 
 const TYPE_TABS = [
   { value: 'all', label: 'All' },
-  { value: 'property', label: 'Property' },
-  { value: 'car', label: 'Vehicles' },
-  { value: 'machinery', label: 'Machinery' },
+  { value: 'car', label: 'Cars' },
 ];
 
 export default function DealerListings({ listings = [] }) {
   const [activeType, setActiveType] = useState('all');
-  const availableTabs = useMemo(
-    () => TYPE_TABS.filter((tab) => tab.value === 'all' || listings.some((listing) => listing._type === tab.value)),
+  const automotiveListings = useMemo(
+    () => listings.filter((listing) => listing._type === 'car'),
     [listings],
   );
+  const availableTabs = useMemo(
+    () => TYPE_TABS.filter((tab) => tab.value === 'all' || automotiveListings.some((listing) => listing._type === tab.value)),
+    [automotiveListings],
+  );
   const filtered = useMemo(
-    () => (activeType === 'all' ? listings : listings.filter((listing) => listing._type === activeType)),
-    [activeType, listings],
+    () => (activeType === 'all' ? automotiveListings : automotiveListings.filter((listing) => listing._type === activeType)),
+    [activeType, automotiveListings],
   );
 
-  if (listings.length === 0) {
+  if (automotiveListings.length === 0) {
     return (
       <div className="py-10 text-center text-muted-foreground">
         <Package className="mx-auto mb-2 h-10 w-10 stroke-1" />
@@ -32,7 +34,7 @@ export default function DealerListings({ listings = [] }) {
 
   return (
     <div className="space-y-4">
-      {availableTabs.length > 2 && (
+      {availableTabs.length > 1 && (
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Filter seller listings">
           {availableTabs.map((tab) => (
             <button

@@ -60,3 +60,24 @@ test('active Automotive surfaces expose only Cars, Services and approved busines
   assert.doesNotMatch(manifest, /property, vehicles, machinery/i);
   assert.doesNotMatch(robots, /property\/\*|machinery\/\*/);
 });
+
+test('active business profiles hide non-automotive inventory and keep contact values behind approved actions', async () => {
+  const [dealerListings, publicBusiness, profileRepository, contactButtons] = await Promise.all([
+    read('src/components/dealers/DealerListings.jsx'),
+    read('src/pages/PublicBusinessProfile.jsx'),
+    read('src/repositories/businessProfilesRepository.js'),
+    read('src/components/listings/ContactButtons.jsx'),
+  ]);
+
+  assert.match(dealerListings, /const automotiveListings = useMemo/);
+  assert.match(dealerListings, /listing\._type === 'car'/);
+  assert.match(dealerListings, /label: 'Cars'/);
+  assert.doesNotMatch(dealerListings, /label: 'Property'|label: 'Machinery'/);
+  assert.match(publicBusiness, /<ContactButtons listing=\{contactListing\} type=\{contactType\}/);
+  assert.doesNotMatch(publicBusiness, /profile\.phone|profile\.email|tel:\$\{|mailto:/);
+  assert.match(profileRepository, /const PUBLIC_PROFILE_SELECT/);
+  assert.doesNotMatch(profileRepository.slice(profileRepository.indexOf('const PUBLIC_PROFILE_SELECT'), profileRepository.indexOf('const OWNER_PROFILE_SELECT')), /\bphone\b|\bemail\b/);
+  assert.match(profileRepository, /const OWNER_PROFILE_SELECT = `\s*\$\{PUBLIC_PROFILE_SELECT\},\s*phone,\s*email,/s);
+  assert.match(contactButtons, /await revealContactDetails\(type, listing\.id\)/);
+  assert.match(contactButtons, /MessageDialog/);
+});

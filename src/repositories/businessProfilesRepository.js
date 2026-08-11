@@ -10,8 +10,6 @@ const PUBLIC_PROFILE_SELECT = `
   business_type,
   profile_type,
   verified,
-  phone,
-  email,
   website,
   social_links,
   city,
@@ -25,6 +23,8 @@ const PUBLIC_PROFILE_SELECT = `
 
 const OWNER_PROFILE_SELECT = `
   ${PUBLIC_PROFILE_SELECT},
+  phone,
+  email,
   verification_status
 `;
 

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Building2, ExternalLink, Loader2, Mail, MapPin, MessageCircle, Phone, Search } from 'lucide-react';
+import { Building2, ExternalLink, Loader2, MapPin, Search } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import DealerListings from '@/components/dealers/DealerListings';
+import ContactButtons from '@/components/listings/ContactButtons';
 import ServiceCard from '@/components/services/ServiceCard';
 import VerifiedBusinessBadge from '@/components/business/VerifiedBusinessBadge';
 import BackButton from '@/components/layout/BackButton';
@@ -16,10 +17,6 @@ import {
   getPublicBusinessServicesPage,
 } from '@/services/businessProfilesService';
 import { CardGridSkeleton, ProfilePageSkeleton } from '@/components/loading/LoadingSkeletons';
-
-function contactNumber(value) {
-  return value?.replace(/[^0-9]/g, '') ?? '';
-}
 
 function flattenUnique(pages = []) {
   const byId = new Map();
@@ -73,6 +70,10 @@ export default function PublicBusinessProfile() {
     enabled: Boolean(profile?.user_id && !dealer),
   });
   const inventory = useMemo(() => flattenUnique(inventoryPages.data?.pages), [inventoryPages.data]);
+  const automotiveInventory = useMemo(
+    () => inventory.filter((item) => item._type === 'car'),
+    [inventory],
+  );
   const services = useMemo(() => flattenUnique(servicePages.data?.pages), [servicePages.data]);
 
   if (profileQuery.isLoading) {
@@ -85,11 +86,12 @@ export default function PublicBusinessProfile() {
     return <PublicBusinessProfileState><h1 className="text-xl font-semibold">Profile not found</h1><p className="mt-2 text-sm text-muted-foreground">This business is unavailable or no longer active.</p><Button asChild variant="outline" className="mt-5"><Link to="/search">Browse PeekaListing</Link></Button></PublicBusinessProfileState>;
   }
 
-  const whatsapp = contactNumber(profile.phone);
   const websiteUrl = safeExternalUrl(profile.website);
   const socialLinks = Object.entries(profile.social_links ?? {})
     .map(([network, url]) => [network, safeExternalUrl(url)])
     .filter(([, url]) => url !== null);
+  const contactListing = dealer ? automotiveInventory[0] : services[0] || automotiveInventory[0];
+  const contactType = services[0] && !dealer ? 'service' : 'car';
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -110,11 +112,12 @@ export default function PublicBusinessProfile() {
               {profile.description && <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">{profile.description}</p>}
             </div>
           </div>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {profile.phone && <Button className="min-h-11" onClick={() => { window.location.href = `tel:${profile.phone}`; }}><Phone className="mr-2 h-4 w-4" />Call</Button>}
-            {whatsapp && <Button className="min-h-11" variant="outline" onClick={() => window.open(`https://wa.me/${whatsapp}`, '_blank', 'noopener,noreferrer')}><MessageCircle className="mr-2 h-4 w-4" />WhatsApp</Button>}
-            {profile.email && <Button className="min-h-11" variant="outline" onClick={() => { window.location.href = `mailto:${profile.email}`; }}><Mail className="mr-2 h-4 w-4" />Email</Button>}
-          </div>
+          {contactListing && (
+            <div className="mt-6 max-w-sm">
+              <p className="mb-2 text-xs leading-5 text-muted-foreground">Contact this {dealer ? 'dealership' : 'business'} about an active {contactType === 'service' ? 'automotive service' : 'car listing'}.</p>
+              <ContactButtons listing={contactListing} type={contactType} placement="profile" />
+            </div>
+          )}
           {(profile.address || websiteUrl || socialLinks.length > 0) && (
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               {profile.address && <span className="text-muted-foreground">{profile.address}</span>}
@@ -128,7 +131,7 @@ export default function PublicBusinessProfile() {
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-7">
         <section aria-labelledby="business-inventory-heading">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><h2 id="business-inventory-heading" className="text-xl font-bold">{dealer ? 'Vehicle inventory' : 'Listings'}</h2><p className="mt-1 text-sm text-muted-foreground">Showing {inventory.length} active {inventory.length === 1 ? 'listing' : 'listings'}</p></div>
+            <div><h2 id="business-inventory-heading" className="text-xl font-bold">{dealer ? 'Vehicle inventory' : 'Car listings'}</h2><p className="mt-1 text-sm text-muted-foreground">Showing {automotiveInventory.length} active {automotiveInventory.length === 1 ? 'car' : 'cars'}</p></div>
             {dealer && (
               <form className="flex w-full gap-2 sm:max-w-sm" onSubmit={(event) => { event.preventDefault(); const next = search.trim(); setSearchParams(next ? { q: next } : {}); }}>
                 <label htmlFor="dealer-inventory-search" className="sr-only">Search dealer inventory</label>
@@ -138,7 +141,7 @@ export default function PublicBusinessProfile() {
             )}
           </div>
           <Card className="mt-4"><CardContent className="p-4">
-            {inventoryPages.isLoading ? <CardGridSkeleton count={6} label="Loading business inventory" /> : inventoryPages.error ? <div className="py-10 text-center"><p>Inventory could not be loaded.</p><Button type="button" variant="outline" className="mt-4" onClick={() => inventoryPages.refetch()}>Try again</Button></div> : <DealerListings listings={inventory} />}
+            {inventoryPages.isLoading ? <CardGridSkeleton count={6} label="Loading business inventory" /> : inventoryPages.error ? <div className="py-10 text-center"><p>Inventory could not be loaded.</p><Button type="button" variant="outline" className="mt-4" onClick={() => inventoryPages.refetch()}>Try again</Button></div> : <DealerListings listings={automotiveInventory} />}
             {inventoryPages.hasNextPage && <div className="mt-5 flex justify-center"><Button type="button" variant="outline" className="min-w-48" disabled={inventoryPages.isFetchingNextPage} onClick={() => inventoryPages.fetchNextPage()}>{inventoryPages.isFetchingNextPage ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading</> : 'Load more listings'}</Button></div>}
           </CardContent></Card>
         </section>
