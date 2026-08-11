@@ -7,10 +7,19 @@ const expectedProjectRef = (
   || process.env.FINDIT_EXPECTED_PROJECT_REF
   || ''
 ).trim();
+const stagingOrigin = (
+  process.env.PEEKALISTING_AUTOMOTIVE_STAGING_ORIGIN
+  || 'https://cars-staging.peekalisting.com'
+).trim().replace(/\/$/, '');
 
 const OLD_FINDIT_STAGING_REF = 'bwgklpxoetrrkutottdb';
 const FINDIT_MARKETPLACE_REF = 'jvbpxnfxkptuexgssplj';
 const PRIVATE_SCHEMA_REJECTION_CODE = 'PGRST106';
+const REQUIRED_EDGE_FUNCTIONS = [
+  'listing-image-upload',
+  'marketplace-image-upload',
+  'delete-account',
+];
 
 if (!supabaseUrl || !supabaseAnonKey || !expectedProjectRef) {
   console.error(
@@ -26,15 +35,21 @@ if ([OLD_FINDIT_STAGING_REF, FINDIT_MARKETPLACE_REF].includes(expectedProjectRef
 }
 
 let base;
+let browserOrigin;
 try {
   base = new URL(supabaseUrl);
+  browserOrigin = new URL(stagingOrigin);
 } catch {
-  console.error('Automotive database boundary verification failed: invalid Supabase URL');
+  console.error('Automotive database boundary verification failed: invalid Supabase or staging URL');
   process.exit(2);
 }
 
 if (base.protocol !== 'https:' || base.hostname !== `${expectedProjectRef}.supabase.co`) {
   console.error('Automotive database boundary verification failed: Supabase URL/ref mismatch');
+  process.exit(1);
+}
+if (browserOrigin.protocol !== 'https:' || browserOrigin.hostname !== 'cars-staging.peekalisting.com') {
+  console.error('Automotive database boundary verification failed: staging origin mismatch');
   process.exit(1);
 }
 
@@ -95,7 +110,44 @@ try {
     process.exit(1);
   }
 
-  console.log(`Automotive database release boundary passed for ${expectedProjectRef}.`);
+  // The minimum automotive browser flows depend on these hosted Edge Functions.
+  // OPTIONS is deliberately used as a non-destructive existence + CORS probe:
+  // no image is uploaded and the account-deletion path cannot mutate a user.
+  for (const functionName of REQUIRED_EDGE_FUNCTIONS) {
+    const functionProbe = await fetch(new URL(`/functions/v1/${functionName}`, base), {
+      method: 'OPTIONS',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        Origin: browserOrigin.origin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization, apikey, content-type, x-client-info',
+      },
+    });
+
+    if (functionProbe.status !== 204) {
+      console.error(
+        `Automotive database boundary verification failed: ${functionName} preflight returned HTTP ${functionProbe.status}`,
+      );
+      process.exit(1);
+    }
+    if (functionProbe.headers.get('access-control-allow-origin') !== browserOrigin.origin) {
+      console.error(
+        `Automotive database boundary verification failed: ${functionName} does not allow the automotive staging origin`,
+      );
+      process.exit(1);
+    }
+    if (!functionProbe.headers.get('access-control-allow-methods')?.includes('POST')) {
+      console.error(
+        `Automotive database boundary verification failed: ${functionName} preflight does not allow POST`,
+      );
+      process.exit(1);
+    }
+  }
+
+  console.log(
+    `Automotive database release boundary passed for ${expectedProjectRef}: database, private schema and core Edge Functions verified.`,
+  );
 } catch (error) {
   console.error(
     `Automotive database boundary verification failed: ${error instanceof Error ? error.message : String(error)}`,
