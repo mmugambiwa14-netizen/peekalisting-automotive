@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [migration, authenticatedRpcClosure, verifier, workflow] = await Promise.all([
+const [migration, authenticatedRpcClosure, verifier, config, workflow] = await Promise.all([
   readFile(new URL('../supabase/migrations/20260811050000_automotive_release_boundary_attestation.sql', import.meta.url), 'utf8'),
   readFile(new URL('../supabase/migrations/20260811051000_authenticated_rpc_anon_closure.sql', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/verify-automotive-release-boundary.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/config.toml', import.meta.url), 'utf8'),
   readFile(new URL('../.github/workflows/automotive-staging.yml', import.meta.url), 'utf8'),
 ]);
 
@@ -47,6 +48,19 @@ test('hosted release attestation rejects anonymous access to authenticated-only 
   assert.match(authenticatedRpcClosure, /has_function_privilege\('anon', function_record\.oid, 'EXECUTE'\)/);
   assert.match(authenticatedRpcClosure, /anonymous EXECUTE remains/i);
   assert.match(authenticatedRpcClosure, /automotive_release_boundary_ready/);
+});
+
+test('private implementation schema is not part of the browser API surface', () => {
+  assert.match(config, /schemas\s*=\s*\["public",\s*"graphql_public"\]/);
+  assert.match(config, /extra_search_path\s*=\s*\["public",\s*"extensions"\]/);
+  assert.doesNotMatch(config, /schemas\s*=\s*\[[^\]]*"private"/);
+
+  assert.match(verifier, /PRIVATE_SCHEMA_REJECTION_CODE\s*=\s*'PGRST106'/);
+  assert.match(verifier, /\/rest\/v1\/rpc\/is_admin/);
+  assert.match(verifier, /'Accept-Profile': 'private'/);
+  assert.match(verifier, /'Content-Profile': 'private'/);
+  assert.match(verifier, /privateSchemaProbe\.status !== 406/);
+  assert.match(verifier, /privateSchemaBody\?\.code !== PRIVATE_SCHEMA_REJECTION_CODE/);
 });
 
 test('hosted verifier requires a true database release attestation from the isolated project', () => {
