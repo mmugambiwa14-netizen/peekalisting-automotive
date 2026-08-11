@@ -63,6 +63,24 @@ test('private implementation schema is not part of the browser API surface', () 
   assert.match(verifier, /privateSchemaBody\?\.code !== PRIVATE_SCHEMA_REJECTION_CODE/);
 });
 
+test('hosted release verifier requires the core automotive Edge Functions and staging CORS', () => {
+  for (const functionName of [
+    'listing-image-upload',
+    'marketplace-image-upload',
+    'delete-account',
+  ]) {
+    assert.match(verifier, new RegExp(`'${functionName}'`));
+  }
+
+  assert.match(verifier, /REQUIRED_EDGE_FUNCTIONS/);
+  assert.match(verifier, /method:\s*'OPTIONS'/);
+  assert.match(verifier, /Access-Control-Request-Method.*POST/);
+  assert.match(verifier, /access-control-allow-origin/);
+  assert.match(verifier, /access-control-allow-methods/);
+  assert.match(verifier, /cars-staging\.peekalisting\.com/);
+  assert.match(verifier, /functionProbe\.status !== 204/);
+});
+
 test('hosted verifier requires a true database release attestation from the isolated project', () => {
   assert.match(verifier, /automotive_release_boundary_ready/);
   assert.match(verifier, /ready !== true/);
