@@ -18,6 +18,7 @@ import ResponsePeekWatchButton from '@/components/peekThreads/ResponsePeekWatchB
 import { PEEK_REQUEST_CATEGORIES, peekRequestCategoryLabel, suggestedRequests } from '@/domain/peekThreads/categories';
 import { findDuplicateRequest } from '@/domain/peekThreads/requestContracts';
 import { useAuth } from '@/lib/AuthContext';
+import { featureFlags } from '@/lib/featureFlags';
 import {
   createPeekRequest,
   declinePeekRequest,
@@ -54,6 +55,7 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
   const [body, setBody] = useState('');
   const [declineTarget, setDeclineTarget] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
+  const requestsWritable = featureFlags.tours;
   const filter = FILTERS[activeFilter];
   const queryKey = ['peek-threads', parentType, parentId, filter.value, filter.sort];
 
@@ -153,6 +155,10 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
   };
 
   const submitRequest = () => runGuarded('request a Peek', () => {
+    if (!requestsWritable) {
+      toast.info('Peek Requests will open after Response Peek capture passes Automotive staging acceptance.');
+      return;
+    }
     if (!parentId) {
       toast.error('This listing is not ready for Peek Requests.');
       return;
@@ -196,12 +202,16 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Visual evidence</p>
             <h2 id={`peek-threads-${parentId}`} className="mt-1 text-xl font-black tracking-tight">Peek Requests</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Ask for specific visual proof before you decide. Seller responses become public Peeks that other buyers can also use.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {requestsWritable
+                ? 'Ask for specific visual proof before you decide. Seller responses become public Peeks that other buyers can also use.'
+                : 'Peek Requests are temporarily read-only while Response Peek capture is being prepared for Automotive. Existing answered requests remain available.'}
+            </p>
           </div>
-          {!isOwner && <Button type="button" size="sm" className="self-start" onClick={() => runGuarded('request a Peek', () => setComposerOpen((open) => !open))}><Plus className="mr-2 h-4 w-4" />Request a Peek</Button>}
+          {!isOwner && requestsWritable && <Button type="button" size="sm" className="self-start" onClick={() => runGuarded('request a Peek', () => setComposerOpen((open) => !open))}><Plus className="mr-2 h-4 w-4" />Request a Peek</Button>}
         </div>
 
-        {composerOpen && !isOwner && (
+        {requestsWritable && composerOpen && !isOwner && (
           <div className="mt-5 rounded-2xl border border-border bg-surface-secondary p-4">
             <label className="text-sm font-semibold" htmlFor={`peek-category-${parentId}`}>What do you want to see?</label>
             <select id={`peek-category-${parentId}`} value={category} onChange={(event) => setCategory(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-border bg-card px-3 text-sm">
@@ -248,8 +258,18 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
       <div className="divide-y divide-border">
         {threadQuery.isLoading && <ListRowsSkeleton rows={4} className="p-3" label="Loading Peek Requests" />}
         {threadQuery.isError && <div className="p-6 text-center"><p className="text-sm text-destructive">Peek Requests could not be loaded.</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => threadQuery.refetch()}>Try again</Button></div>}
-        {!threadQuery.isLoading && !threadQuery.isError && items.length === 0 && <div className="p-8 text-center"><Eye className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 font-semibold">No Peek Requests here yet</p><p className="mt-1 text-sm text-muted-foreground">Be the first buyer to ask for useful visual evidence.</p></div>}
-        {items.map((item) => <ThreadCard key={item.requestId} item={item} isOwner={isOwner} busy={supportMutation.isPending || declineMutation.isPending} onSupport={() => runGuarded('update your interest in this Peek Request', () => supportMutation.mutate({ requestId: item.requestId, supported: item.supportedByMe }))} onDecline={() => { setDeclineTarget(item); setDeclineReason(''); }} />)}
+        {!threadQuery.isLoading && !threadQuery.isError && items.length === 0 && (
+          <div className="p-8 text-center">
+            <Eye className="mx-auto h-7 w-7 text-muted-foreground" />
+            <p className="mt-3 font-semibold">{requestsWritable ? 'No Peek Requests here yet' : 'Response Peek capture is being prepared'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {requestsWritable
+                ? 'Be the first buyer to ask for useful visual evidence.'
+                : 'New Peek Requests will open after the response pipeline passes Automotive staging acceptance.'}
+            </p>
+          </div>
+        )}
+        {items.map((item) => <ThreadCard key={item.requestId} item={item} isOwner={isOwner} requestsWritable={requestsWritable} busy={supportMutation.isPending || declineMutation.isPending} onSupport={() => runGuarded('update your interest in this Peek Request', () => supportMutation.mutate({ requestId: item.requestId, supported: item.supportedByMe }))} onDecline={() => { setDeclineTarget(item); setDeclineReason(''); }} />)}
         {!threadQuery.isLoading && !threadQuery.isError && threadQuery.hasNextPage && (
           <div className="flex justify-center p-4">
             <Button type="button" variant="outline" disabled={threadQuery.isFetchingNextPage} onClick={() => threadQuery.fetchNextPage()}>
@@ -273,7 +293,7 @@ export default function PeekThreadsSection({ parentType = 'listing', parentId, l
   );
 }
 
-function ThreadCard({ item, isOwner, busy, onSupport, onDecline }) {
+function ThreadCard({ item, isOwner, requestsWritable, busy, onSupport, onDecline }) {
   const answered = item.status === 'answered' && item.currentResponseId;
   return (
     <article className="p-5 sm:p-6">
@@ -290,14 +310,14 @@ function ThreadCard({ item, isOwner, busy, onSupport, onDecline }) {
         <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-success/20 bg-success/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Response Peek available</p><p className="mt-1 text-xs text-muted-foreground">Captured {new Date(item.answeredAt || item.createdAt).toLocaleDateString()}</p></div><ResponsePeekWatchButton tourId={item.currentResponseId} title={item.body} /></div>
       ) : (
         <div className="mt-4 flex flex-wrap gap-2">
-          {!isOwner && !item.requestedByMe && (
+          {!isOwner && !item.requestedByMe && (requestsWritable || item.supportedByMe) && (
             <Button type="button" size="sm" variant={item.supportedByMe ? 'secondary' : 'outline'} aria-pressed={item.supportedByMe} disabled={busy} onClick={onSupport}>
               {item.supportedByMe ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <ThumbsUp className="mr-2 h-4 w-4" />}
               {item.supportedByMe ? 'Interested' : 'I want this too'}
             </Button>
           )}
           {isOwner && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onDecline}><XCircle className="mr-2 h-4 w-4" />Decline</Button>}
-          {isOwner && <Button type="button" size="sm" onClick={() => window.location.assign(`/peek-requests?request=${encodeURIComponent(item.requestId)}`)}><Eye className="mr-2 h-4 w-4" />Record response</Button>}
+          {isOwner && requestsWritable && <Button type="button" size="sm" onClick={() => window.location.assign(`/peek-requests?request=${encodeURIComponent(item.requestId)}`)}><Eye className="mr-2 h-4 w-4" />Record response</Button>}
         </div>
       )}
     </article>
