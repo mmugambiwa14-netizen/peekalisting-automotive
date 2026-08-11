@@ -104,3 +104,12 @@ jobs:
 
       - name: Build production application
         run: npm run build
+
+      - name: Archive canonical migration inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: automotive-migrations-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: supabase/migrations/**
