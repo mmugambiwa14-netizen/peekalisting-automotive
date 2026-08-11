@@ -6,6 +6,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "https://staging.peekalisting.com",
   "https://staging.peekalisting.pages.dev",
+  "https://cars-staging.peekalisting.com",
 ];
 
 const ALLOWED_ORIGINS = new Set(
@@ -18,7 +19,8 @@ function isAllowedOrigin(origin: string): boolean {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   try {
     const hostname = new URL(origin).hostname.toLowerCase();
-    return hostname === "staging.peekalisting.com" || hostname === "staging.peekalisting.pages.dev";
+    return hostname === "staging.peekalisting.com" || hostname === "staging.peekalisting.pages.dev" ||
+      hostname === "cars-staging.peekalisting.com";
   } catch {
     return false;
   }
