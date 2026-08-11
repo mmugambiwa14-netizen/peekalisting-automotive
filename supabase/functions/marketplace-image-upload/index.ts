@@ -2,7 +2,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { MAX_BYTES, prepareTrustedImage, sha256Hex } from "../_shared/trusted-image.ts";
 
 const ALLOWED_ORIGINS = new Set(
-  (Deno.env.get("FINDIT_ALLOWED_ORIGINS") ?? "http://127.0.0.1:5173,http://localhost:5173")
+  (Deno.env.get("FINDIT_ALLOWED_ORIGINS") ??
+    "http://127.0.0.1:5173,http://localhost:5173,https://cars-staging.peekalisting.com")
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""))
     .filter(Boolean),
