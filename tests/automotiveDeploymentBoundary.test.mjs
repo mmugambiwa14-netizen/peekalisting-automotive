@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/automotive-staging.yml', 'utf8');
+const automotiveCi = readFileSync('.github/workflows/automotive-ci.yml', 'utf8');
 const verifier = readFileSync('scripts/verify-automotive-staging.mjs', 'utf8');
 const supabaseSetup = readFileSync('docs/SUPABASE_SETUP.md', 'utf8');
 
@@ -19,6 +20,13 @@ test('automotive staging deploys only to its isolated Cloudflare and Supabase bo
   assert.ok(workflow.includes(`!= \"${FINDIT_MARKETPLACE_REF}\"`));
   assert.match(workflow, /workflow_dispatch/);
   assert.doesNotMatch(workflow, /branches:\s*\n\s*- main/);
+});
+
+test('automotive CI preserves the canonical migration inventory as a reconciliation artifact', () => {
+  assert.match(automotiveCi, /actions\/upload-artifact@/);
+  assert.match(automotiveCi, /name:\s*automotive-migrations-/);
+  assert.match(automotiveCi, /path:\s*supabase\/migrations\/\*\*/);
+  assert.match(automotiveCi, /if-no-files-found:\s*error/);
 });
 
 test('hosted verification exercises Cars V3 and the approved dealer directory', () => {
