@@ -57,7 +57,7 @@ jobs:
       VITE_FEATURE_SERVICE_RADIUS: "false"
       VITE_FEATURE_LISTING_EXPIRY: "false"
       VITE_FEATURE_LISTING_FRESHNESS_REMINDERS: "false"
-      VITE_FEATURE_TOURS: ${{ vars.VITE_FEATURE_TOURS || 'false' }}
+      VITE_FEATURE_TOURS: "false"
       VITE_FEATURE_TOURS_PREVIEW: "false"
       VITE_FEATURE_PREVIEW_FIXTURES: "false"
       VITE_PREVIEW_AUTH_BYPASS: "false"
@@ -71,8 +71,8 @@ jobs:
       VITE_FEATURE_AI_SUPPORT_CHAT: "false"
       VITE_FEATURE_SCHEDULED_REMINDERS: "false"
       VITE_FEATURE_MARKETING_EMAILS: "false"
-      TOURS_BACKEND_ENABLED: ${{ vars.TOURS_BACKEND_ENABLED || 'false' }}
-      FINDIT_TOURS_WORKERS_ENABLED: ${{ vars.FINDIT_TOURS_WORKERS_ENABLED || 'false' }}
+      TOURS_BACKEND_ENABLED: "false"
+      FINDIT_TOURS_WORKERS_ENABLED: "false"
       FINDIT_TOURS_RELEASE_ACCEPTED: "false"
       FINDIT_TOUR_PROCESSOR_MODE: github-actions
       FINDIT_TOUR_CLEANUP_WORKER_SECRET: ${{ secrets.FINDIT_TOUR_CLEANUP_WORKER_SECRET }}
@@ -104,6 +104,10 @@ jobs:
           test "$VITE_SUPABASE_URL" = "https://${PEEKALISTING_EXPECTED_PROJECT_REF}.supabase.co"
           test "$PEEKALISTING_EXPECTED_PROJECT_REF" != "bwgklpxoetrrkutottdb"
           test "$PEEKALISTING_EXPECTED_PROJECT_REF" != "jvbpxnfxkptuexgssplj"
+          test "$VITE_FEATURE_TOURS" = "false"
+          test "$TOURS_BACKEND_ENABLED" = "false"
+          test "$FINDIT_TOURS_WORKERS_ENABLED" = "false"
+          test "$FINDIT_TOURS_RELEASE_ACCEPTED" = "false"
 
       - name: Normalize locked dependency metadata
         run: node ./scripts/normalize-package-lock.mjs --write
