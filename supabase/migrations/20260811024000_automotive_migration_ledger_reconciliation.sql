@@ -1,15 +1,25 @@
 -- Preserve every executed migration row while removing the specific ambiguous
 -- hosted-replay names known from the original Automotive Staging repair.
 --
--- This migration must also be safe in a clean migration replay: the generated
--- hosted versions below do not exist on a fresh database, so their absence is a
--- valid no-op. If one of those versions does exist, its name and statement hash
--- must match the audited historical row before it can be renamed.
+-- This migration is also part of the canonical clean-database chain. A clean
+-- database, or a hosted database whose ledger has already been reconciled by a
+-- later audited repair, has no duplicate logical names and therefore needs no
+-- mutation here. Only an actually ambiguous ledger enters the hash-locked
+-- historical repair path below.
 
 do $reconcile$
 declare
   row_record record;
 begin
+  if not exists (
+    select 1
+    from supabase_migrations.schema_migrations
+    group by name
+    having count(*) > 1
+  ) then
+    return;
+  end if;
+
   for row_record in
     select *
     from (values
@@ -46,6 +56,7 @@ begin
       select 1
       from supabase_migrations.schema_migrations migration
       where migration.version = row_record.version
+        and migration.name = row_record.original_name
     ) then
       if not exists (
         select 1
