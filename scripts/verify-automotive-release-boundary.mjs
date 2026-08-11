@@ -10,6 +10,7 @@ const expectedProjectRef = (
 
 const OLD_FINDIT_STAGING_REF = 'bwgklpxoetrrkutottdb';
 const FINDIT_MARKETPLACE_REF = 'jvbpxnfxkptuexgssplj';
+const PRIVATE_SCHEMA_REJECTION_CODE = 'PGRST106';
 
 if (!supabaseUrl || !supabaseAnonKey || !expectedProjectRef) {
   console.error(
@@ -37,14 +38,16 @@ if (base.protocol !== 'https:' || base.hostname !== `${expectedProjectRef}.supab
   process.exit(1);
 }
 
+const browserHeaders = {
+  apikey: supabaseAnonKey,
+  Authorization: `Bearer ${supabaseAnonKey}`,
+  'Content-Type': 'application/json',
+};
+
 try {
   const response = await fetch(new URL('/rest/v1/rpc/automotive_release_boundary_ready', base), {
     method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: browserHeaders,
     body: '{}',
   });
 
@@ -56,6 +59,39 @@ try {
   const ready = await response.json();
   if (ready !== true) {
     console.error('Automotive database boundary verification failed: hosted boundary attestation is not true');
+    process.exit(1);
+  }
+
+  // Public SECURITY INVOKER wrappers intentionally need EXECUTE on privileged
+  // implementations in the private schema. That is safe only while PostgREST
+  // refuses to expose the private schema itself. Probe a known private helper
+  // using the anonymous browser key and require PostgREST's schema-not-exposed
+  // rejection rather than treating function-level auth errors as sufficient.
+  const privateSchemaProbe = await fetch(new URL('/rest/v1/rpc/is_admin', base), {
+    method: 'POST',
+    headers: {
+      ...browserHeaders,
+      'Accept-Profile': 'private',
+      'Content-Profile': 'private',
+    },
+    body: '{}',
+  });
+
+  let privateSchemaBody = null;
+  try {
+    privateSchemaBody = await privateSchemaProbe.json();
+  } catch {
+    // A non-JSON response is still a failure below because the verifier expects
+    // PostgREST's explicit schema-not-exposed error contract.
+  }
+
+  if (
+    privateSchemaProbe.status !== 406
+    || privateSchemaBody?.code !== PRIVATE_SCHEMA_REJECTION_CODE
+  ) {
+    console.error(
+      'Automotive database boundary verification failed: hosted PostgREST did not explicitly reject the private schema',
+    );
     process.exit(1);
   }
 
