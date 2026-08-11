@@ -170,7 +170,7 @@ create index if not exists idx_peek_requests_current_response
   on public.peek_requests(current_response_id) where current_response_id is not null;
 
 -- Fail the migration if the optimized policies accidentally drift from their
--- role/action contract or still contain direct auth.uid() calls.
+-- role/action contract or still contain the direct per-row comparison form.
 do $verify$
 declare
   remaining_direct_auth_uid integer;
@@ -216,12 +216,12 @@ begin
       'users_manage_own_web_push_subscriptions'
     )
     and (
-      coalesce(qual, '') ~ '(^|[^A-Za-z0-9_])auth\\.uid\\(\\)'
-      or coalesce(with_check, '') ~ '(^|[^A-Za-z0-9_])auth\\.uid\\(\\)'
+      coalesce(qual, '') ~ '= auth\\.uid\\(\\)'
+      or coalesce(with_check, '') ~ '= auth\\.uid\\(\\)'
     );
 
   if remaining_direct_auth_uid <> 0 then
-    raise exception 'direct auth.uid() calls remain in % launch policies', remaining_direct_auth_uid;
+    raise exception 'direct auth.uid() comparisons remain in % launch policies', remaining_direct_auth_uid;
   end if;
 end;
 $verify$;
