@@ -71,10 +71,11 @@ test('V3 derives dealer identity from approved marketplace state and keeps the p
   assert.match(rollback, /drop function if exists public\.public_listing_search_card_page_v3/);
   assert.match(rollback, /drop index if exists public\.idx_car_details_automotive_model_trgm/);
 
-  const privateReturnStart = v3Migration.indexOf('returns table (');
-  const privateReturnEnd = v3Migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
+  const normalizedV3Migration = v3Migration.replaceAll('\r\n', '\n');
+  const privateReturnStart = normalizedV3Migration.indexOf('returns table (');
+  const privateReturnEnd = normalizedV3Migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
-  assert.doesNotMatch(v3Migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb|description text|contact_phone text|contact_email text/);
+  assert.doesNotMatch(normalizedV3Migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb|description text|contact_phone text|contact_email text/);
 });
 
 test('dealer directory rollback remains paired and non-destructive', async () => {

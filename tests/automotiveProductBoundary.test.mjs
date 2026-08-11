@@ -22,7 +22,8 @@ test('public shell is automotive-first without deleting reusable dormant routes'
   assert.doesNotMatch(home, /DiscoverCategoryGrid/);
   assert.match(nav, /label: 'Sell'/);
   assert.doesNotMatch(nav, /label: 'Post'/);
-  for (const label of ["'Cars'", "'Dealers'", "'Services'", "'Peeks'", "'Chats'"]) assert.match(topNav, new RegExp(`label: ${label}`));
+  for (const label of ["'Cars'", "'Dealers'", "'Services'", "'Chats'"]) assert.match(topNav, new RegExp(`label: ${label}`));
+  assert.doesNotMatch(topNav, /label: 'Peeks'/);
   assert.match(topNav, /<span>Sell<\/span>/);
   assert.doesNotMatch(topNav, /<span>Post<\/span>/);
   assert.ok(app.includes('path="/post" element={<CreateListing />}'));
@@ -97,10 +98,11 @@ test('vehicle discovery exposes globally useful independent facets through a min
   assert.match(migration, /kind = 'car'::public\.listing_kind/);
   assert.match(migration, /car\.fuel_type::text = p_fuel_type/);
   assert.match(migration, /car\.transmission::text = p_transmission/);
-  const privateReturnStart = migration.indexOf('returns table (');
-  const privateReturnEnd = migration.indexOf(')\nlanguage plpgsql', privateReturnStart);
+  const normalizedMigration = migration.replaceAll('\r\n', '\n');
+  const privateReturnStart = normalizedMigration.indexOf('returns table (');
+  const privateReturnEnd = normalizedMigration.indexOf(')\nlanguage plpgsql', privateReturnStart);
   assert.ok(privateReturnStart >= 0 && privateReturnEnd > privateReturnStart);
-  assert.doesNotMatch(migration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
+  assert.doesNotMatch(normalizedMigration.slice(privateReturnStart, privateReturnEnd), /attributes jsonb/);
 });
 
 test('automotive Peek surfaces ask for observable evidence instead of becoming a generic media feed', async () => {

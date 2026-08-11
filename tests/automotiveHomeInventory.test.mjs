@@ -12,13 +12,14 @@ test('home Cars inventory uses the same V3 public projection as automotive searc
     read('src/components/listings/ListingCard.jsx'),
   ]);
 
-  const latestFunction = repository.match(/export async function findLatestAvailableListings[\s\S]*?\n}\n\nexport async function findSavedListingsByIds/)?.[0] || '';
+  const normalizedRepository = repository.replaceAll('\r\n', '\n');
+  const latestFunction = normalizedRepository.match(/export async function findLatestAvailableListings[\s\S]*?\n}\n\nexport async function findSavedListingsByIds/)?.[0] || '';
   assert.ok(latestFunction, 'latest inventory function exists');
   assert.match(latestFunction, /if \(kind === 'car'\)/);
   assert.match(latestFunction, /public_listing_search_card_page_v3/);
   assert.match(latestFunction, /automotiveSearchParams\(\{ pageSize: limit \}\)/);
   assert.match(latestFunction, /cursor_value: _cursorValue/);
-  assert.match(repository, /suspension rules, seller-native currency, authoritative dealer identity/);
+  assert.match(normalizedRepository, /suspension rules, seller-native currency, authoritative dealer identity/);
   assert.match(service, /findLatestAvailableListings/);
   assert.match(home, /getLatestPublicListings\('car', 8\)/);
   assert.match(card, /seller_type === 'dealer'/);
@@ -27,7 +28,8 @@ test('home Cars inventory uses the same V3 public projection as automotive searc
 
 test('dormant non-car latest inventory keeps the existing reusable table path', async () => {
   const repository = await read('src/repositories/publicListingsRepository.js');
-  const latestFunction = repository.match(/export async function findLatestAvailableListings[\s\S]*?\n}\n\nexport async function findSavedListingsByIds/)?.[0] || '';
+  const normalizedRepository = repository.replaceAll('\r\n', '\n');
+  const latestFunction = normalizedRepository.match(/export async function findLatestAvailableListings[\s\S]*?\n}\n\nexport async function findSavedListingsByIds/)?.[0] || '';
   assert.match(latestFunction, /\.from\('listings'\)/);
   assert.match(latestFunction, /\.in\('status', \['available', 'under_offer'\]\)/);
 });

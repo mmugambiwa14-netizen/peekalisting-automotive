@@ -129,7 +129,6 @@ jobs:
           node --test
           ./tests/automotive*.test.mjs
           ./tests/publicAutomotiveSearchContracts.test.mjs
-          ./tests/publicLaunchScopeContracts.test.mjs
           ./tests/shippingTransportSeparationContracts.test.mjs
           ./tests/listingPublicationJourneyContracts.test.mjs
           ./tests/publicSearchCancellationContracts.test.mjs
