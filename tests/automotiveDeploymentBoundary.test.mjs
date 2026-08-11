@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/automotive-staging.yml', 'utf8');
 const verifier = readFileSync('scripts/verify-automotive-staging.mjs', 'utf8');
+const supabaseSetup = readFileSync('docs/SUPABASE_SETUP.md', 'utf8');
 
 const AUTOMOTIVE_STAGING_REF = 'epllatutrwbxnmsikkuc';
 const OLD_FINDIT_STAGING_REF = 'bwgklpxoetrrkutottdb';
@@ -33,4 +34,19 @@ test('hosted verifier independently refuses inherited FindIt Supabase targets', 
   assert.match(verifier, new RegExp(OLD_FINDIT_STAGING_REF));
   assert.match(verifier, new RegExp(FINDIT_MARKETPLACE_REF));
   assert.match(verifier, /PEEKALISTING_EXPECTED_PROJECT_REF/);
+});
+
+test('Supabase setup references only migration files that exist in the repository', () => {
+  const migrationNames = [...supabaseSetup.matchAll(/`([^`]+\.sql)`/g)].map((match) => match[1]);
+  assert.ok(migrationNames.length > 0, 'Supabase setup should name its critical migration checkpoints');
+
+  for (const migrationName of migrationNames) {
+    assert.ok(
+      existsSync(`supabase/migrations/${migrationName}`),
+      `docs/SUPABASE_SETUP.md references missing migration ${migrationName}`,
+    );
+  }
+
+  assert.match(supabaseSetup, /authoritative migration inventory is the contents of `supabase\/migrations\/`/i);
+  assert.match(supabaseSetup, /npm run verify:sql-boundary/);
 });
