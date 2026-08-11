@@ -105,6 +105,7 @@ jobs:
       - name: Build production application
         run: npm run build
 
+      # Keep the canonical SQL inventory downloadable for hosted staging reconciliation.
       - name: Archive canonical migration inventory
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
