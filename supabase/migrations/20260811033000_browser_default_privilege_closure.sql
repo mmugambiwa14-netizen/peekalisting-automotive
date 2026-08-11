@@ -98,12 +98,16 @@ alter default privileges for role postgres in schema public
 alter default privileges for role postgres in schema public
   revoke usage on sequences from anon;
 
--- Future postgres-owned functions must never become browser-callable
--- implicitly. RPC migrations must grant the exact wrapper/role surface.
+-- PostgreSQL's built-in function default grants EXECUTE to PUBLIC globally.
+-- A schema-local REVOKE cannot remove that hard-wired global default, so close
+-- PUBLIC globally for postgres-owned functions, then also clear any explicit
+-- browser grants attached to the two application schemas.
+alter default privileges for role postgres
+  revoke execute on functions from public;
 alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated;
+  revoke execute on functions from anon, authenticated;
 alter default privileges for role postgres in schema private
-  revoke execute on functions from public, anon, authenticated;
+  revoke execute on functions from anon, authenticated;
 
 -- Fail closed if any live object still exposes a bypassing browser privilege.
 do $verify_live$
@@ -179,7 +183,7 @@ $verify_live$;
 do $verify_defaults$
 declare
   bad_defaults integer;
-  missing_function_acl integer;
+  global_function_acl_closed boolean;
 begin
   select count(*)::integer into bad_defaults
   from pg_default_acl d
@@ -187,7 +191,6 @@ begin
   cross join lateral aclexplode(d.defaclacl) x
   left join pg_roles grantee on grantee.oid = x.grantee
   where pg_get_userbyid(d.defaclrole) = 'postgres'
-    and n.nspname in ('public','private')
     and (
       (d.defaclobjtype = 'r'
         and n.nspname = 'public'
@@ -206,6 +209,7 @@ begin
         and grantee.rolname = 'anon'
         and x.privilege_type = 'USAGE')
       or (d.defaclobjtype = 'f'
+        and (d.defaclnamespace = 0 or n.nspname in ('public','private'))
         and coalesce(grantee.rolname, 'PUBLIC') in ('PUBLIC','anon','authenticated')
         and x.privilege_type = 'EXECUTE')
     );
@@ -214,22 +218,23 @@ begin
     raise exception 'unsafe postgres browser default ACL entries remain: %', bad_defaults;
   end if;
 
-  -- PostgreSQL gives new functions EXECUTE to PUBLIC unless ALTER DEFAULT
-  -- PRIVILEGES creates an explicit ACL. Require an explicit function-default
-  -- ACL in both application schemas.
-  select count(*)::integer into missing_function_acl
-  from (values ('public'),('private')) expected(schema_name)
-  where not exists (
+  select exists (
     select 1
     from pg_default_acl d
-    join pg_namespace n on n.oid = d.defaclnamespace
     where pg_get_userbyid(d.defaclrole) = 'postgres'
-      and n.nspname = expected.schema_name
+      and d.defaclnamespace = 0
       and d.defaclobjtype = 'f'
-  );
+      and not exists (
+        select 1
+        from aclexplode(d.defaclacl) x
+        left join pg_roles grantee on grantee.oid = x.grantee
+        where coalesce(grantee.rolname, 'PUBLIC') in ('PUBLIC','anon','authenticated')
+          and x.privilege_type = 'EXECUTE'
+      )
+  ) into global_function_acl_closed;
 
-  if missing_function_acl <> 0 then
-    raise exception 'postgres function default ACL closure missing for % application schemas', missing_function_acl;
+  if not global_function_acl_closed then
+    raise exception 'global postgres function default EXECUTE is not fail-closed';
   end if;
 end;
 $verify_defaults$;
