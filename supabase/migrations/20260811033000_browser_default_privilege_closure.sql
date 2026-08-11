@@ -1,13 +1,43 @@
 -- Close the remaining browser privilege paths on Automotive Staging.
 --
--- Earlier hardening covered TRUNCATE/TRIGGER/REFERENCES for objects/defaults
--- created by postgres, but Supabase also carries defaults owned by
--- supabase_admin. PostgreSQL's MAINTAIN table privilege and sequence UPDATE
--- were also left browser-accessible. Keep browser DML behind explicit RLS/
--- grants, prevent maintenance/RLS-bypassing operations, and make future RPCs
--- fail closed unless a migration grants EXECUTE deliberately.
+-- Application migrations and all application objects in public/private are
+-- owned by postgres. Supabase also carries platform-owned default ACLs for
+-- supabase_admin, but the project migration role cannot alter that superuser's
+-- defaults. Fail closed by asserting the app ownership boundary, hardening all
+-- live app objects, and hardening postgres defaults for every future app
+-- migration.
 
 begin;
+
+-- Application objects must stay under the migration owner whose defaults this
+-- repository controls. A different owner would bypass the guarantees below.
+do $owners$
+declare
+  bad_relations integer;
+  bad_functions integer;
+begin
+  select count(*)::integer into bad_relations
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname in ('public','private')
+    and c.relkind in ('r','p','S','v','m')
+    and pg_get_userbyid(c.relowner) <> 'postgres';
+
+  if bad_relations <> 0 then
+    raise exception 'application relation ownership drift detected: % non-postgres objects', bad_relations;
+  end if;
+
+  select count(*)::integer into bad_functions
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('public','private')
+    and pg_get_userbyid(p.proowner) <> 'postgres';
+
+  if bad_functions <> 0 then
+    raise exception 'application function ownership drift detected: % non-postgres functions', bad_functions;
+  end if;
+end;
+$owners$;
 
 -- Existing public tables: no browser role may hold privileges that bypass or
 -- materially interfere with row-level application authorization.
@@ -55,38 +85,24 @@ begin
 end;
 $sequences$;
 
--- Future tables. Cover both grantors used by hosted Supabase migrations.
+-- Future postgres-owned tables.
 alter default privileges for role postgres in schema public
   revoke truncate, trigger, references, maintain on tables from anon, authenticated;
 alter default privileges for role postgres in schema public
   revoke insert, update, delete on tables from anon;
 
-alter default privileges for role supabase_admin in schema public
-  revoke truncate, trigger, references, maintain on tables from anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke insert, update, delete on tables from anon;
-
--- Future sequences: prevent setval() from browser roles and prevent anonymous
--- nextval() access while preserving authenticated USAGE where explicitly
--- inherited by the hosted defaults.
+-- Future postgres-owned sequences. Prevent setval() from browser roles and
+-- anonymous nextval() access while preserving authenticated USAGE.
 alter default privileges for role postgres in schema public
   revoke update on sequences from anon, authenticated;
 alter default privileges for role postgres in schema public
   revoke usage on sequences from anon;
-alter default privileges for role supabase_admin in schema public
-  revoke update on sequences from anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke usage on sequences from anon;
 
--- Future functions must never become browser-callable implicitly. Application
--- RPC migrations must grant the exact wrapper/role surface they intend.
+-- Future postgres-owned functions must never become browser-callable
+-- implicitly. RPC migrations must grant the exact wrapper/role surface.
 alter default privileges for role postgres in schema public
   revoke execute on functions from public, anon, authenticated;
 alter default privileges for role postgres in schema private
-  revoke execute on functions from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke execute on functions from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema private
   revoke execute on functions from public, anon, authenticated;
 
 -- Fail closed if any live object still exposes a bypassing browser privilege.
@@ -159,7 +175,7 @@ begin
 end;
 $verify_live$;
 
--- Verify the two hosted migration owners cannot recreate the same defaults.
+-- Verify postgres defaults cannot recreate the same browser exposure.
 do $verify_defaults$
 declare
   bad_defaults integer;
@@ -170,7 +186,7 @@ begin
   left join pg_namespace n on n.oid = d.defaclnamespace
   cross join lateral aclexplode(d.defaclacl) x
   left join pg_roles grantee on grantee.oid = x.grantee
-  where pg_get_userbyid(d.defaclrole) in ('postgres','supabase_admin')
+  where pg_get_userbyid(d.defaclrole) = 'postgres'
     and n.nspname in ('public','private')
     and (
       (d.defaclobjtype = 'r'
@@ -195,31 +211,25 @@ begin
     );
 
   if bad_defaults <> 0 then
-    raise exception 'unsafe browser default ACL entries remain: %', bad_defaults;
+    raise exception 'unsafe postgres browser default ACL entries remain: %', bad_defaults;
   end if;
 
   -- PostgreSQL gives new functions EXECUTE to PUBLIC unless ALTER DEFAULT
-  -- PRIVILEGES creates an explicit ACL. Require an f-row for both owners and
-  -- both application schemas so absence cannot silently mean the built-in
-  -- permissive default.
+  -- PRIVILEGES creates an explicit ACL. Require an explicit function-default
+  -- ACL in both application schemas.
   select count(*)::integer into missing_function_acl
-  from (values
-    ('postgres','public'),
-    ('postgres','private'),
-    ('supabase_admin','public'),
-    ('supabase_admin','private')
-  ) expected(owner_name, schema_name)
+  from (values ('public'),('private')) expected(schema_name)
   where not exists (
     select 1
     from pg_default_acl d
     join pg_namespace n on n.oid = d.defaclnamespace
-    where pg_get_userbyid(d.defaclrole) = expected.owner_name
+    where pg_get_userbyid(d.defaclrole) = 'postgres'
       and n.nspname = expected.schema_name
       and d.defaclobjtype = 'f'
   );
 
   if missing_function_acl <> 0 then
-    raise exception 'function default ACL closure missing for % owner/schema pairs', missing_function_acl;
+    raise exception 'postgres function default ACL closure missing for % application schemas', missing_function_acl;
   end if;
 end;
 $verify_defaults$;
