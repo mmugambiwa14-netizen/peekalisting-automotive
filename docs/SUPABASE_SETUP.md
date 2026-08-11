@@ -4,9 +4,9 @@ PeekaListing Automotive requires its own Supabase project. The original FindIt p
 
 ## Automotive staging target
 
-Create a dedicated project named `PeekaListing Automotive Staging` in the approved Supabase organization. The current repository deployment boundary expects its project ref through `PEEKALISTING_AUTOMOTIVE_STAGING_PROJECT_REF` and rejects both inherited FindIt project refs.
+The dedicated project is `PeekaListing Automotive Staging` (`epllatutrwbxnmsikkuc`) in `eu-west-2`. The active staging workflow is pinned to that project through `PEEKALISTING_EXPECTED_PROJECT_REF` and explicitly rejects both inherited FindIt project refs.
 
-Use `eu-west-2` unless an explicit infrastructure decision changes the region. This matches the existing hosted baseline while keeping the new database independent.
+Do not repoint the automotive client or deployment workflow to either inherited FindIt project.
 
 ## Local development
 
@@ -31,11 +31,16 @@ Use the local public Supabase URL and publishable/anon key reported by `supabase
 
 ## Database provisioning
 
-A fresh automotive project must receive the repository migration chain in order. Do not cherry-pick only the newest automotive migrations onto an empty database because they depend on the established marketplace, moderation, notification, business, media and Peek schemas.
+A fresh automotive project must receive the repository migration chain in order. **The authoritative migration inventory is the contents of `supabase/migrations/`, not a hand-maintained shortlist in this document.** Do not cherry-pick only the newest automotive migrations onto an empty database because they depend on the established marketplace, moderation, notification, business, media and Peek schemas.
 
-The automotive tail of the chain includes:
+Before any hosted replay:
 
-- `20260808000000_automotive_launch_core.sql`
+```bash
+npm run verify:sql-boundary
+```
+
+The current automotive tail includes:
+
 - `20260810150000_automotive_open_vehicle_submission.sql`
 - `20260810151000_automotive_search_projection.sql`
 - `20260810152000_automotive_service_taxonomy.sql`
@@ -43,9 +48,11 @@ The automotive tail of the chain includes:
 - `20260810154000_automotive_model_seller_search.sql`
 - `20260810155000_automotive_public_dealer_profile_gate.sql`
 
-The full chain also includes later hardening such as `20260810052000_unified_release_gate_repairs.sql`, which moves authenticated Web Push preference implementations behind the private schema and preserves review-before-takedown report semantics.
+Those files are **not** a standalone migration set. Their prerequisites include earlier timestamped work such as `20260807011000_verified_business_profile_bootstrap.sql`, `20260807030000_remove_listing_content_review_from_mvp.sql`, and `20260808081300_listing_schema_v2_submission.sql`, plus the complete numbered chain.
 
-After migration, run the database/RLS checks and Supabase security advisor before enabling public traffic.
+The full chain also includes hardening such as `20260810052000_unified_release_gate_repairs.sql`, which moves authenticated Web Push preference implementations behind the private schema and preserves review-before-takedown report semantics.
+
+After migration, verify the live migration ledger and schema objects against the repository, then run the database/RLS checks and Supabase security advisor before enabling public traffic. At minimum, Cars V3 search and `public_automotive_dealers_page` must exist before the Cloudflare staging deployment is triggered; the hosted verifier is not a substitute for applying the database chain.
 
 ## Core storage and Edge Functions
 
