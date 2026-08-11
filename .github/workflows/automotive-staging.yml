@@ -139,6 +139,9 @@ jobs:
       - name: Verify deployment security contracts
         run: npm run verify:deployment-security
 
+      - name: Verify hosted automotive database release boundary
+        run: node ./scripts/verify-automotive-release-boundary.mjs
+
       - name: Prepare Pages Functions runtime
         run: node ./scripts/prepare-pages-functions-runtime.mjs
 
