@@ -154,8 +154,8 @@ begin
   where n.nspname = 'public'
     and c.relkind = 'S'
     and (
-      has_sequence_privilege('anon', c.oid, 'UPDATE')
-      or has_sequence_privilege('anon', c.oid, 'USAGE')
+      has_sequence_privilege('anon', format('%I.%I', n.nspname, c.relname), 'UPDATE')
+      or has_sequence_privilege('anon', format('%I.%I', n.nspname, c.relname), 'USAGE')
     );
 
   if bad_anon_sequences <> 0 then
@@ -167,7 +167,7 @@ begin
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public'
     and c.relkind = 'S'
-    and has_sequence_privilege('authenticated', c.oid, 'UPDATE');
+    and has_sequence_privilege('authenticated', format('%I.%I', n.nspname, c.relname), 'UPDATE');
 
   if bad_auth_sequence_updates <> 0 then
     raise exception 'authenticated sequence UPDATE remains on % public sequences', bad_auth_sequence_updates;
