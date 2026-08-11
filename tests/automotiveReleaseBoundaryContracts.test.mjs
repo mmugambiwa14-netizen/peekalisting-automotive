@@ -81,6 +81,17 @@ test('hosted release verifier requires the core automotive Edge Functions and st
   assert.match(verifier, /functionProbe\.status !== 204/);
 });
 
+test('automotive staging keeps full video Tours disabled until separately provisioned', () => {
+  assert.match(workflow, /VITE_FEATURE_TOURS:\s*"false"/);
+  assert.match(workflow, /VITE_FEATURE_TOURS_PREVIEW:\s*"false"/);
+  assert.match(workflow, /TOURS_BACKEND_ENABLED:\s*"false"/);
+  assert.match(workflow, /FINDIT_TOURS_WORKERS_ENABLED:\s*"false"/);
+  assert.match(workflow, /FINDIT_TOURS_RELEASE_ACCEPTED:\s*"false"/);
+  assert.doesNotMatch(workflow, /VITE_FEATURE_TOURS:\s*\$\{\{/);
+  assert.doesNotMatch(workflow, /TOURS_BACKEND_ENABLED:\s*\$\{\{/);
+  assert.doesNotMatch(workflow, /FINDIT_TOURS_WORKERS_ENABLED:\s*\$\{\{/);
+});
+
 test('hosted verifier requires a true database release attestation from the isolated project', () => {
   assert.match(verifier, /automotive_release_boundary_ready/);
   assert.match(verifier, /ready !== true/);
