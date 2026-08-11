@@ -11,8 +11,6 @@ import ListingFeatureItem from "@/components/listings/ListingFeatureItem";
 import ListingMediaActions from "@/components/listings/ListingMediaActions";
 import ListingMediaViewer from "@/components/listings/ListingMediaViewer";
 import ListingSummary from "@/components/listings/ListingSummary";
-import PeekThreadsSection from "@/components/peekThreads/PeekThreadsSection";
-import PeekRequestIntentHandler from "@/components/peekThreads/PeekRequestIntentHandler";
 import {
   ListingDescription,
   ListingDetailTabs,
@@ -88,11 +86,10 @@ export default function ServiceDetail() {
 
   return (
     <div className="findit-screen pb-24">
-      <PeekRequestIntentHandler />
       <ListingDetailActions onBack={() => goBackOrHome(navigate, '/')} />
       <main className="mx-auto max-w-4xl">
         <div className="relative">
-          <ListingMediaViewer photos={service.photos} title={service.title} fallbackImage={null} tour={service.tour || null} tourActionLabel="Take a Peek" tourOwnerId={service.provider_id} parentType="service" parentId={service.id} className="md:mt-4 md:rounded-3xl md:border" />
+          <ListingMediaViewer photos={service.photos} title={service.title} fallbackImage={null} className="md:mt-4 md:rounded-3xl md:border" />
           <ListingMediaActions onShare={shareService} onSave={serviceFavourite.toggle} isSaved={serviceFavourite.isSaved} isSaving={serviceFavourite.isSaving} />
         </div>
 
@@ -103,7 +100,6 @@ export default function ServiceDetail() {
               badges={(
                 <>
                   <Badge variant="secondary" className="rounded-full bg-primary/12 text-primary">{categoryLabel}</Badge>
-                  {service.tour?.status === "ready" && <Badge className="bg-success/15 text-success">Video proof available</Badge>}
                   {subcategoryLabels.map((label, index) => <Badge key={`${label}-${index}`} variant="outline">{label}</Badge>)}
                 </>
               )}
@@ -123,10 +119,9 @@ export default function ServiceDetail() {
               <ListingFeatureItem icon={Globe2} label="Service mode" value={deliveryLabel} />
               <ListingFeatureItem icon={Route} label="Coverage" value={coverageLabel} />
               <ListingFeatureItem icon={Clock3} label="Typical response" value={attributeValues.response_time_hours ? `${attributeValues.response_time_hours} hours` : "Ask provider"} />
-              <ListingFeatureItem icon={BadgeCheck} label="Proof" value={service.tour?.status === "ready" ? "Video Peek available" : "Ask for examples"} />
+              <ListingFeatureItem icon={BadgeCheck} label="Proof" value="Ask provider for examples" />
             </div>
             <div className="mt-6 space-y-5">
-              <PeekThreadsSection parentType="service" parentId={service.id} listingKind="service" ownerId={service.provider_id} guard={guard} />
               <SafetyPanel>Agree on the scope, timeline and pricing in writing before work begins. PeekaListing does not handle service payments.</SafetyPanel>
             </div>
           </ListingTabSection>

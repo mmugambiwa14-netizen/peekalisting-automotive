@@ -41,18 +41,14 @@ const CreateListing = lazy(() => import('@/pages/CreateListing'));
 const CuratedCreateService = lazy(() => import('@/pages/CuratedCreateService'));
 const Saved = lazy(() => import('@/pages/Saved'));
 const Profile = lazy(() => import('@/pages/Profile'));
-const PropertyDetail = lazy(() => import('@/pages/PropertyDetail'));
 const CarDetail = lazy(() => import('@/pages/CarDetail'));
 const MyListings = lazy(() => import('@/pages/MyListings'));
-const BuyerPeekRequests = lazy(() => import('@/pages/BuyerPeekRequests'));
 const Inquiries = lazy(() => import('@/pages/Inquiries'));
-const MachineryDetail = lazy(() => import('@/pages/MachineryDetail'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const BusinessProfiles = lazy(() => import('@/pages/BusinessProfiles'));
 const PublicBusinessProfile = lazy(() => import('@/pages/PublicBusinessProfile'));
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
 const AdminListings = lazy(() => import('@/pages/admin/AdminListings'));
-const AdminPeeks = lazy(() => import('@/pages/admin/AdminPeeks'));
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
 const AdminReports = lazy(() => import('@/pages/admin/AdminReports'));
 const AdminSupportRequests = lazy(() => import('@/pages/admin/AdminSupportRequests'));
@@ -68,8 +64,6 @@ const LegalPage = lazy(() => import('@/pages/LegalPage'));
 const Services = lazy(() => import('@/pages/Services'));
 const ServiceDetail = lazy(() => import('@/pages/ServiceDetail'));
 const MyServices = lazy(() => import('@/pages/MyServices'));
-const Tours = lazy(() => import('@/pages/Tours'));
-const ToursPlaceholder = lazy(() => import('@/pages/ToursPlaceholder'));
 const PageNotFound = lazy(() => import('@/lib/PageNotFound'));
 
 const LoadingScreen = () => <AppShellSkeleton />;
@@ -162,16 +156,17 @@ const AuthenticatedApp = () => {
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
           <Route path="/dealers" element={<Dealers />} />
-          <Route path="/property/:id" element={<PropertyDetail />} />
           <Route path="/car/:id" element={<CarDetail />} />
-          <Route path="/machinery/:id" element={<MachineryDetail />} />
+          <Route path="/property/:id" element={<Navigate to="/" replace />} />
+          <Route path="/machinery/:id" element={<Navigate to="/" replace />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
           {featureFlags.businessProfiles && <Route path="/business/:id" element={<PublicBusinessProfile />} />}
           <Route path="/dealer/:id" element={<PublicBusinessProfile />} />
           <Route path="/services" element={<Services />} />
           <Route path="/service/:id" element={<ServiceDetail />} />
-          {(featureFlags.tours || featureFlags.toursPreview) && <Route path="/peek" element={featureFlags.tours ? <Tours /> : <ToursPlaceholder />} />}
-          {(featureFlags.tours || featureFlags.toursPreview) && <Route path="/tours" element={<LegacyPathRedirect to="/peek" />} />}
+          <Route path="/peek" element={<Navigate to="/" replace />} />
+          <Route path="/tours" element={<Navigate to="/" replace />} />
+          <Route path="/peek-requests" element={<Navigate to="/" replace />} />
           <Route path="/help" element={<FAQs />} />
           <Route path="/help/contact" element={<ContactSupport />} />
           <Route path="/legal" element={<LegalPage />} />
@@ -190,7 +185,6 @@ const AuthenticatedApp = () => {
             <Route path="/saved" element={<Saved />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-listings" element={<MyListings />} />
-            <Route path="/peek-requests" element={<BuyerPeekRequests />} />
             <Route path="/settings" element={<Settings />} />
             {featureFlags.messaging && <Route path="/chats" element={<Inquiries />} />}
             {featureFlags.messaging && <Route path="/chats/:conversationId" element={<Inquiries />} />}
@@ -203,7 +197,6 @@ const AuthenticatedApp = () => {
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/listings" element={<AdminListings />} />
-            <Route path="/admin/peeks" element={<AdminPeeks />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/admin/support" element={<AdminSupportRequests />} />

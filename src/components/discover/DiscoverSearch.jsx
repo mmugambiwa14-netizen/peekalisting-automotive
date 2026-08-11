@@ -11,7 +11,7 @@ export default function DiscoverSearch({ location }) {
   const submit = (event) => {
     event.preventDefault();
     const value = query.trim().slice(0, 100);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ type: 'car' });
     if (value) params.set('q', value);
     if (location?.city) {
       params.set('location', location.city);
@@ -29,8 +29,8 @@ export default function DiscoverSearch({ location }) {
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search properties, cars, services..."
-        aria-label="Search FindIt"
+        placeholder="Search cars, makes or models..."
+        aria-label="Search cars"
         maxLength={100}
         className="locked-control h-14 rounded-[1.15rem] border-border/85 bg-card/80 pl-11 pr-4 text-base placeholder:text-muted-foreground/80 md:text-sm sm:pr-28"
       />

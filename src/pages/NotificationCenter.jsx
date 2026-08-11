@@ -8,7 +8,6 @@ import {
   CheckCheck,
   CheckCircle2,
   Clock3,
-  Film,
   Loader2,
   MessageSquareMore,
   ShieldCheck,
@@ -38,18 +37,22 @@ const EVENT_STYLE = {
   listing_expires_soon: { label: 'Expiry reminder', icon: Clock3, className: 'text-amber-600 dark:text-amber-400' },
   report_resolved: { label: 'Report resolved', icon: ShieldCheck, className: 'text-blue-600 dark:text-blue-400' },
   account_status: { label: 'Account update', icon: UserRoundCog, className: 'text-primary' },
-  tour_ready: { label: 'Peek ready', icon: Film, className: 'text-green-600 dark:text-green-400' },
-  tour_failed: { label: 'Peek failed', icon: AlertCircle, className: 'text-destructive' },
-  tour_rejected: { label: 'Peek unavailable', icon: XCircle, className: 'text-destructive' },
   listing_status_changed: { label: 'Listing update', icon: Clock3, className: 'text-primary' },
   saved_listing_unavailable: { label: 'Saved listing update', icon: AlertCircle, className: 'text-amber-600 dark:text-amber-400' },
-  peek_request_created: { label: 'New Peek Request', icon: MessageSquareMore, className: 'text-primary' },
-  peek_request_answered: { label: 'Peek Request answered', icon: Film, className: 'text-green-600 dark:text-green-400' },
   new_message: { label: 'New message', icon: MessageSquareMore, className: 'text-primary' },
   business_application_updated: { label: 'Business application', icon: BriefcaseBusiness, className: 'text-primary' },
   business_category_updated: { label: 'Business category', icon: BriefcaseBusiness, className: 'text-primary' },
   managed_listing_updated: { label: 'Managed listing', icon: BriefcaseBusiness, className: 'text-primary' },
 };
+
+function isActiveAutomotiveNotification(item) {
+  const eventType = String(item?.event_type || '').toLowerCase();
+  const link = String(item?.link || '').toLowerCase();
+  return !eventType.startsWith('tour_')
+    && !eventType.startsWith('peek_request_')
+    && !link.startsWith('/peek')
+    && !link.startsWith('/tours');
+}
 
 function markPageRead(page, notificationId = null, readAt = new Date().toISOString()) {
   if (!page || !Array.isArray(page.items)) return page;
@@ -132,10 +135,10 @@ export default function NotificationCenter() {
 
   const items = useMemo(() => {
     const byId = new Map();
-    for (const item of tailQuery.data?.items || []) byId.set(item.id, item);
+    for (const item of tailQuery.data?.items || []) if (isActiveAutomotiveNotification(item)) byId.set(item.id, item);
     for (const page of notificationsQuery.data?.pages || []) {
       for (const item of page.items) {
-        if (!byId.has(item.id)) byId.set(item.id, item);
+        if (isActiveAutomotiveNotification(item) && !byId.has(item.id)) byId.set(item.id, item);
       }
     }
     return [...byId.values()];
@@ -204,7 +207,7 @@ export default function NotificationCenter() {
       ) : notificationsQuery.isError && items.length === 0 ? (
         <div className="mx-4 mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-center" role="alert"><p className="font-medium">We could not load notifications</p><p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p><Button className="mt-4" variant="outline" onClick={() => notificationsQuery.refetch()}>Try again</Button></div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-4 py-20 text-center text-muted-foreground"><Bell className="mb-3 h-12 w-12 stroke-1" /><p className="font-medium">No notifications yet</p><p className="mt-1 max-w-sm text-sm">Messages, Peek activity, listing changes, business updates and important account notices will appear here.</p></div>
+        <div className="flex flex-col items-center justify-center px-4 py-20 text-center text-muted-foreground"><Bell className="mb-3 h-12 w-12 stroke-1" /><p className="font-medium">No notifications yet</p><p className="mt-1 max-w-sm text-sm">Messages, car listing changes, business updates and important account notices will appear here.</p></div>
       ) : (
         <>
           <div className="divide-y divide-border">

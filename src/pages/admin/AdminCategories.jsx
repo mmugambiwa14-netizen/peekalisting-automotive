@@ -34,6 +34,8 @@ const emptyCreate = {
   reason: '',
 };
 
+const ACTIVE_MARKETPLACE_KINDS = new Set(['car', 'service']);
+
 function commaList(value) {
   return [...new Set(String(value || '').split(',').map((item) => item.trim()).filter(Boolean))];
 }
@@ -112,10 +114,14 @@ export default function AdminCategories() {
   const [createForm, setCreateForm] = useState(emptyCreate);
   const [editForm, setEditForm] = useState(null);
   const queryClient = useQueryClient();
-  const { data: categories = [], isLoading, error } = useQuery({
+  const { data: rawCategories = [], isLoading, error } = useQuery({
     queryKey: ['admin-taxonomy'],
     queryFn: getAdminTaxonomy,
   });
+  const categories = useMemo(
+    () => rawCategories.filter((category) => ACTIVE_MARKETPLACE_KINDS.has(category.marketplaceKind)),
+    [rawCategories],
+  );
 
   const roots = useMemo(
     () => categories.filter((category) => category.depth === 0).sort((a, b) => a.sortOrder - b.sortOrder),

@@ -12,16 +12,6 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { cn } from '@/lib/utils';
 import { addServiceFavourite, removeServiceFavourite } from '@/services/serviceFavouritesService';
 
-function serviceTour(service) {
-  if (service.tour) return service.tour;
-  if (!service.hasTour && !service.has_tour && !service.tour_status) return null;
-  return {
-    status: service.tour_status || 'ready',
-    durationSeconds: service.tour_duration_seconds,
-    thumbnailUrl: service.tour_thumbnail_url,
-  };
-}
-
 export default function ServiceCard({ service, onOpen = null, layout = 'browse', className = null, isSaved = false, onSave = null }) {
   const { format } = useCurrency();
   const { user } = useAuth();
@@ -115,8 +105,6 @@ export default function ServiceCard({ service, onOpen = null, layout = 'browse',
         attributes={attributes}
         meta={service.category_label || 'Service'}
         save={layout === 'recommendation' ? null : { active: saved, onToggle: toggleSave, disabled: saving }}
-        tour={serviceTour(service)}
-        tourLabel="Peek"
         sellerName={service.provider_name}
         sellerLabel="Provider"
         actions={hasDirectContact ? <ContactButtons listing={service} type="service" placement="browse" /> : null}

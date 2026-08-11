@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { removeStagedListingImage, uploadListingImage } from '@/services/listingCreationService';
 import TourUploader from '@/components/tours/TourUploader';
 import { customerErrorMessage } from '@/lib/customerErrors';
+import { featureFlags } from '@/lib/featureFlags';
 import StepNav from './StepNav';
 
 export default function ListingMediaContactStep({ formData, update, media, setMedia, tourDraft, setTourDraft, onBack, onContinue }) {
@@ -69,19 +70,19 @@ export default function ListingMediaContactStep({ formData, update, media, setMe
     <p className="-mt-3 text-xs leading-5 text-muted-foreground">Your browser may ask for photo access. PeekaListing only receives the photos you select.</p>
     <input ref={inputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={upload} />
     {media.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{media.map((item, index) => <div key={item.path} className="relative aspect-square overflow-hidden rounded-xl border"><img src={item.previewUrl} alt={`Listing image ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />{index === 0 && <span className="absolute bottom-2 left-2 rounded-md bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground">Cover</span>}<div className="absolute right-2 top-2 flex gap-1">{index > 0 && <Button type="button" size="icon" className="h-9 w-9" onClick={() => makeCover(index)} aria-label={`Make image ${index + 1} the cover`}><Star className="h-4 w-4" /></Button>}<Button type="button" size="icon" variant="destructive" className="h-9 w-9" onClick={() => remove(item)} aria-label={`Remove image ${index + 1}`}><Trash2 className="h-4 w-4" /></Button></div><Button type="button" size="icon" variant="secondary" className="absolute bottom-2 right-2 h-9 w-9" onClick={() => setPreviewIndex(index)} aria-label={`Expand image ${index + 1}`}><Maximize className="h-4 w-4" /></Button></div>)}</div>}
-    <TourUploader
+    {featureFlags.tours && <TourUploader
       category={formData.listing_category}
       value={tourDraft}
       onChange={setTourDraft}
       disabled={uploading}
       onBusyChange={setTourBusy}
       onSkip={continueIfValid}
-    />
+    />}
     <div className="space-y-4 border-t pt-5">
       <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/8 p-3">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
         <div>
-          <p className="text-sm font-semibold">Your contact details stay hidden in FindIt</p>
+          <p className="text-sm font-semibold">Your contact details stay hidden in PeekaListing</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">Buyers see only the contact methods you enable. Your phone number or email address becomes visible only after they choose to open their phone, WhatsApp, or email app.</p>
         </div>
       </div>

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Bell, Building2, Camera, CarFront, Search, ShieldCheck, Wrench } from 'lucide-react';
+import { ArrowRight, Bell, Building2, CarFront, FileCheck2, Search, ShieldCheck, Wrench } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { readStoredJson, removeStoredValue, writeStoredJson } from '@/lib/browserStorage';
 import BrandLogo from '@/components/BrandLogo';
 import DiscoverHeader from '@/components/discover/DiscoverHeader';
-import HomePeekRail from '@/components/discover/HomePeekRail';
 import ListingCard from '@/components/listings/ListingCard';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { featureFlags } from '@/lib/featureFlags';
@@ -104,7 +103,7 @@ export default function Home() {
           <div className="max-w-3xl">
             <p className="findit-overline">Zimbabwe automotive marketplace</p>
             <h1 id="automotive-home-title" className="mt-3 text-[2.35rem] font-black leading-[1.02] tracking-[-0.045em] text-foreground sm:text-5xl lg:text-[3.65rem]">Find the car. See more before you go.</h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">Browse vehicles across Zimbabwe, watch current Peeks, and ask sellers to show what matters before you spend time travelling to see a car.</p>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">Browse cars across Zimbabwe, compare the facts that matter, and contact sellers with confidence before you spend time travelling to see a vehicle.</p>
           </div>
 
           <form onSubmit={submitSearch} className="mt-7 grid gap-3 md:grid-cols-[minmax(0,1fr)_260px_auto]" role="search">
@@ -145,14 +144,12 @@ export default function Home() {
           </div>
         </section>
 
-        <HomePeekRail location={location} />
-
         <section className="mt-10" aria-labelledby="evidence-title">
-          <div className="max-w-2xl"><p className="findit-overline">Before you travel</p><h2 id="evidence-title" className="fluid-section-title mt-1">A listing should tell you more than a price.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">PeekaListing separates seller claims from visual evidence, and lets buyers ask for a current view of something specific.</p></div>
+          <div className="max-w-2xl"><p className="findit-overline">Before you travel</p><h2 id="evidence-title" className="fluid-section-title mt-1">Know what you are comparing.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">PeekaListing keeps vehicle facts, seller declarations, location context and contact choices clear so you can make a better-informed shortlist.</p></div>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
-            <EvidenceCard icon={Camera} title="Current Peeks" text="See recent visual evidence attached to the actual vehicle instead of relying only on old gallery photos." />
-            <EvidenceCard icon={Search} title="Request what matters" text="Ask for the dashboard, tyres, engine bay, interior, a cold start, or another specific view before arranging a visit." />
-            <EvidenceCard icon={ShieldCheck} title="Clear provenance" text="PeekaListing shows what a seller declared, what was captured through PeekaListing, and what still has not been shown." />
+            <EvidenceCard icon={CarFront} title="Useful vehicle facts" text="Compare model year, mileage, body style, fuel, transmission, drivetrain and registration details in one place." />
+            <EvidenceCard icon={FileCheck2} title="Seller declarations" text="See clearly which details come from the seller and which questions still need an in-person check." />
+            <EvidenceCard icon={ShieldCheck} title="Safer contact" text="Contact methods stay hidden until you deliberately open a phone, WhatsApp or email action." />
           </div>
         </section>
 

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "PeekaListing Marketplace",
   "short_name": "PeekaListing",
-  "description": "Browse local listings, view public Peeks, and request current evidence before you commit.",
+  "description": "Find cars, trusted dealers and automotive services across Zimbabwe.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",
@@ -41,7 +41,7 @@
     {
       "name": "Search listings",
       "short_name": "Search",
-      "description": "Browse property, vehicles, machinery and services",
+      "description": "Browse Cars across Zimbabwe",
       "url": "/search",
       "icons": [{ "src": "/brand/peekalisting-binoculars.svg", "sizes": "any", "type": "image/svg+xml" }]
     },

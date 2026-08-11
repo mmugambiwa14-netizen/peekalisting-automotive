@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Building2, CarFront, CirclePlay, MessageCircle, Plus, UserRound, Wrench } from 'lucide-react';
+import { Building2, CarFront, MessageCircle, Plus, UserRound, Wrench } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { featureFlags } from '@/lib/featureFlags';
 import { isNavigationItemActive } from '@/lib/navigationConfig';
@@ -16,7 +16,6 @@ const AUTOMOTIVE_DESKTOP_NAV = Object.freeze([
   { label: 'Cars', icon: CarFront, path: '/search?type=car', activePath: '/search' },
   { label: 'Dealers', icon: Building2, path: '/dealers', activePath: '/dealers' },
   { label: 'Services', icon: Wrench, path: '/services', activePath: '/services' },
-  { label: 'Peeks', icon: CirclePlay, path: '/peek', activePath: '/peek', feature: 'tours', previewFeature: 'toursPreview' },
   { label: 'Chats', icon: MessageCircle, path: '/chats', activePath: '/chats', feature: 'messaging', countKey: 'chats' },
 ]);
 

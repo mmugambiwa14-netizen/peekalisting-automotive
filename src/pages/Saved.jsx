@@ -3,7 +3,6 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowLeft, Bookmark, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ListingGrid from "@/components/listings/ListingGrid";
-import MachineryGrid from "@/components/listings/MachineryGrid";
 import ServiceGrid from "@/components/services/ServiceGrid";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,11 +44,9 @@ export default function Saved() {
     return [...byId.values()];
   }, [servicesQuery.data]);
   const { isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = favouritesQuery;
-  const totalSaved = favourites.length + savedServices.length;
-  const savedProperties = favourites.filter((listing) => listing._type === "property");
   const savedCars = favourites.filter((listing) => listing._type === "car");
-  const savedMachinery = favourites.filter((listing) => listing._type === "machinery");
-  const savedIds = favourites.map((listing) => listing.id);
+  const totalSaved = savedCars.length + savedServices.length;
+  const savedIds = savedCars.map((listing) => listing.id);
 
   return (
     <div className="min-h-screen">
@@ -57,7 +54,7 @@ export default function Saved() {
         <Link to="/" aria-label="Back to Discover" className="flex h-11 w-11 items-center justify-center rounded-xl"><ArrowLeft className="w-5 h-5" /></Link>
         <div className="flex items-center gap-1.5">
           <Bookmark className="w-4 h-4 text-primary" />
-          <h1 className="font-bold text-lg">Favourites</h1>
+          <h1 className="font-bold text-lg">Saved</h1>
         </div>
         {totalSaved > 0 && (
           <span className="text-xs text-muted-foreground ml-auto">{totalSaved} saved</span>
@@ -65,7 +62,7 @@ export default function Saved() {
       </div>
 
       {isLoading || servicesQuery.isLoading ? (
-        <CardGridSkeleton count={6} className="px-4 py-4" label="Loading favourites" />
+        <CardGridSkeleton count={6} className="px-4 py-4" label="Loading saved items" />
       ) : totalSaved === 0 && (isError || servicesQuery.isError) ? (
         <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
           <Bookmark className="mb-3 h-12 w-12 stroke-1 text-muted-foreground" />
@@ -76,26 +73,18 @@ export default function Saved() {
       ) : totalSaved === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <Bookmark className="w-12 h-12 mb-3 stroke-1" />
-          <p className="font-medium">No saved items yet</p>
-          <p className="text-sm mt-1">Tap the heart icon on any listing or service to save it</p>
+          <p className="font-medium">No saved cars or services yet</p>
+          <p className="text-sm mt-1">Tap the heart icon on a car or service to keep it here</p>
         </div>
       ) : (
         <div className="px-4 py-4">
-          <Tabs defaultValue={savedProperties.length ? "properties" : savedCars.length ? "cars" : savedMachinery.length ? "machinery" : "services"}>
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-              <TabsTrigger value="properties">Properties ({savedProperties.length})</TabsTrigger>
+          <Tabs defaultValue={savedCars.length ? "cars" : "services"}>
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="cars">Cars ({savedCars.length})</TabsTrigger>
-              <TabsTrigger value="machinery">Machinery ({savedMachinery.length})</TabsTrigger>
               <TabsTrigger value="services">Services ({savedServices.length})</TabsTrigger>
             </TabsList>
-            <TabsContent value="properties" className="mt-4">
-              <ListingGrid listings={savedProperties} type="property" savedIds={savedIds} />
-            </TabsContent>
             <TabsContent value="cars" className="mt-4">
               <ListingGrid listings={savedCars} type="car" savedIds={savedIds} />
-            </TabsContent>
-            <TabsContent value="machinery" className="mt-4">
-              <MachineryGrid listings={savedMachinery} />
             </TabsContent>
             <TabsContent value="services" className="mt-4">
               {servicesQuery.isError ? (

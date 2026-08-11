@@ -56,7 +56,7 @@ export async function resolveCurrentMarketplaceLocation({ consentGranted = false
 export function currentLocationErrorMessage(error) {
   switch (error?.message) {
     case 'GEOLOCATION_CONSENT_REQUIRED':
-      return 'Choose Allow once before FindIt asks your browser for location access.';
+      return 'Choose Allow once before PeekaListing asks your browser for location access.';
     case 'GEOLOCATION_PERMISSION_DENIED':
       return 'Location access was declined. You can still choose any country and place manually.';
     case 'GEOLOCATION_UNSUPPORTED':
@@ -67,7 +67,7 @@ export function currentLocationErrorMessage(error) {
     case 'LOCATION_LOOKUP_TIMEOUT':
       return 'Location matching took too long. Try again or choose a place manually.';
     case 'CURRENT_LOCATION_OUTSIDE_SUPPORTED_MARKET':
-      return 'That position is outside FindIt’s supported Sub-Saharan markets. Choose a country and place manually.';
+      return 'That position is outside PeekaListing’s supported launch market. Choose a place manually.';
     default:
       return 'We could not match your position to a registered place. Choose it manually instead.';
   }

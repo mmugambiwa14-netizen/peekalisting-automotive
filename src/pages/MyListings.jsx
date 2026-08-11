@@ -22,7 +22,6 @@ import {
 import { changeOwnerListingState } from '@/services/listingCreationService';
 import { ListRowsSkeleton } from '@/components/loading/LoadingSkeletons';
 
-const placeholderProperty = getListingPlaceholder("property");
 const placeholderCar = getListingPlaceholder("car");
 
 const SOURCE_LABELS = {
@@ -61,7 +60,7 @@ export default function MyListings() {
     for (const page of listingsQuery.data?.pages || []) {
       for (const listing of page.items) byId.set(listing.id, listing);
     }
-    return [...byId.values()];
+    return [...byId.values()].filter((listing) => listing._type === 'car');
   }, [listingsQuery.data]);
   const { isLoading, error: listingsError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = listingsQuery;
 
@@ -282,8 +281,8 @@ export default function MyListings() {
  * }} props
  */
 function ListingRow({ listing, onDelete, onRenew, onEdit, onPublish, onPause, onResume, onUnavailable }) {
-  const photo = listing.photos?.[0] || (listing._type === "property" ? placeholderProperty : placeholderCar);
-  const link = listing._type === "property" ? `/property/${listing.id}` : listing._type === "car" ? `/car/${listing.id}` : `/machinery/${listing.id}`;
+  const photo = listing.photos?.[0] || placeholderCar;
+  const link = `/car/${listing.id}`;
   const timeAgo = useTimeAgo(listing.created_date);
   const isExpired = listing.status === "expired";
   const isDraft = ["draft", "rejected"].includes(listing.status);

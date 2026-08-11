@@ -22,8 +22,11 @@ export const featureFlags = {
   messaging: stagingCertifiedFlag('VITE_FEATURE_MESSAGING'),
   essentialNotifications: stagingCertifiedFlag('VITE_FEATURE_ESSENTIAL_NOTIFICATIONS'),
 
-  tours: stagingCertifiedFlag('VITE_FEATURE_TOURS'),
-  toursPreview: flag('VITE_FEATURE_TOURS_PREVIEW', Boolean(viteEnv.DEV)),
+  // Full Tours / Response Peek remains a separate release capability. Keep
+  // both browser flags hard-off for this Automotive frontend until runtime
+  // acceptance is complete; a trusted hostname must never silently promote it.
+  tours: false,
+  toursPreview: false,
   previewFixtures: flag('VITE_FEATURE_PREVIEW_FIXTURES'),
 
   // Map rendering is available whenever the provider stack is configured.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Calendar, CarFront, CirclePlay, Fuel, Gauge, Palette, Settings, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, Calendar, CarFront, Fuel, Gauge, Palette, Settings, ShieldCheck, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { GuestPromptSheet } from "@/components/auth/GuestPromptSheet";
 import ContactButtons from "@/components/listings/ContactButtons";
@@ -12,8 +12,6 @@ import ListingMediaActions from "@/components/listings/ListingMediaActions";
 import ListingMediaViewer from "@/components/listings/ListingMediaViewer";
 import ListingRecommendations from "@/components/listings/ListingRecommendations";
 import ListingSummary from "@/components/listings/ListingSummary";
-import PeekThreadsSection from "@/components/peekThreads/PeekThreadsSection";
-import PeekRequestIntentHandler from "@/components/peekThreads/PeekRequestIntentHandler";
 import MakeOfferButton from "@/components/listings/MakeOfferButton";
 import PriceBreakdown from "@/components/listings/PriceBreakdown";
 import ReportListingDialog from "@/components/listings/ReportListingDialog";
@@ -63,17 +61,6 @@ function displayValue(value) {
   return VALUE_LABELS[value] || String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function peekFreshness(publishedAt) {
-  const timestamp = Date.parse(String(publishedAt || ""));
-  if (!Number.isFinite(timestamp)) return null;
-  const days = Math.max(0, Math.floor((Date.now() - timestamp) / 86_400_000));
-  if (days === 0) return "Captured today";
-  if (days === 1) return "Captured yesterday";
-  if (days < 30) return `Captured ${days} days ago`;
-  const months = Math.max(1, Math.floor(days / 30));
-  return `Captured about ${months} ${months === 1 ? "month" : "months"} ago`;
-}
-
 export default function CarDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -98,17 +85,14 @@ export default function CarDetail() {
   const variants = (car.variants || []).filter((variant) => variant && Number(variant.price) > 0);
   const activePrice = variants[selectedVariant]?.price ?? car.price;
   const location = car.public_location_label || [car.suburb, car.city, car.province].filter(Boolean).join(", ");
-  const currentPeek = car.tour?.status === "ready" ? car.tour : null;
-  const currentPeekFreshness = peekFreshness(currentPeek?.publishedAt);
   const accidentHistory = displayValue(car.accident_history);
 
   return (
     <div className="findit-screen pb-24">
-      <PeekRequestIntentHandler />
       <ListingDetailActions onBack={() => goBackOrHome(navigate, '/')} />
       <main className="mx-auto max-w-4xl">
         <div className="relative">
-          <ListingMediaViewer photos={car.photos} title={car.title} fallbackImage={placeholderCar} tour={car.tour || null} tourActionLabel="Watch current Peek" tourOwnerId={car.seller_id} parentType="listing" parentId={car.id} className="md:mt-4 md:rounded-3xl md:border" />
+          <ListingMediaViewer photos={car.photos} title={car.title} fallbackImage={placeholderCar} className="md:mt-4 md:rounded-3xl md:border" />
           <ListingMediaActions onShare={() => shareListing("car", car)} onSave={toggleSave} isSaved={isSaved} isSaving={isSaving} />
         </div>
 
@@ -119,7 +103,6 @@ export default function CarDetail() {
               badges={(
                 <>
                   {car.condition && <Badge variant="secondary" className="rounded-full bg-primary/12 text-primary">Seller-declared: {displayValue(car.condition)}</Badge>}
-                  {currentPeek && <Badge className="bg-success/15 text-success">Current Peek</Badge>}
                   {car.negotiable && <Badge variant="outline">Negotiable</Badge>}
                   {car.status !== "available" && <Badge variant="destructive" className="capitalize">{String(car.status).replaceAll("_", " ")}</Badge>}
                 </>
@@ -130,22 +113,6 @@ export default function CarDetail() {
               location={location}
               metadata={[<ListingCode key="car-code" type="car" id={car.id} />]}
             />
-
-            <section className="mt-5 rounded-3xl border border-primary/20 bg-primary/5 p-5" aria-labelledby="vehicle-evidence-title">
-              <div className="flex gap-3">
-                <span className="locked-icon-tile h-11 w-11 shrink-0"><CirclePlay className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="findit-overline">Visual evidence</p>
-                  <h2 id="vehicle-evidence-title" className="mt-1 text-lg font-extrabold">{currentPeek ? "Current vehicle Peek available" : "No current vehicle Peek yet"}</h2>
-                  {currentPeek ? (
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Captured through PeekaListing{currentPeekFreshness ? ` · ${currentPeekFreshness}` : ""}. Watch what has been shown, then request another specific view if something important is missing.</p>
-                  ) : (
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Ask the seller for a current exterior walkaround, engine start, dashboard, tyres, engine bay, interior or another specific view.</p>
-                  )}
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">A Peek records visual information tied to this listing. It is not a mechanical inspection, ownership verification or guarantee of condition.</p>
-                </div>
-              </div>
-            </section>
 
             <div className="mt-5">
               <div className="mb-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><h2 className="text-sm font-extrabold">Vehicle facts and seller declarations</h2></div>
@@ -170,11 +137,10 @@ export default function CarDetail() {
             )}
 
             <div className="mt-6 space-y-5">
-              <PeekThreadsSection parentType="listing" parentId={car.id} listingKind="car" ownerId={car.seller_id} guard={guard} />
               <VariantSelector variants={car.variants} selectedIndex={selectedVariant} onSelect={setSelectedVariant} />
               <PriceBreakdown listing={car} />
               {car.accepts_offers && <MakeOfferButton listing={car} />}
-              <SafetyPanel>A Peek can help you decide whether a vehicle is worth pursuing, but it does not replace an independent mechanical inspection. Verify seller identity and ownership documents, inspect the vehicle in person where possible, and never send money only because a video or listing looks convincing.</SafetyPanel>
+              <SafetyPanel>Listing details are seller-provided and do not replace an independent mechanical inspection. Verify seller identity and ownership documents, inspect the vehicle in person where possible, and never send money only because a listing looks convincing.</SafetyPanel>
               <ListingRecommendations subjectListingId={car.id} />
               <ReportListingDialog listing={car} listingType="car" />
             </div>

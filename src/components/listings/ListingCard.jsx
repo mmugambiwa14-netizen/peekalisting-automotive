@@ -54,16 +54,6 @@ function listingAttributes(listing, type) {
   ].filter(Boolean);
 }
 
-function tourSummary(listing) {
-  if (listing.tour) return listing.tour;
-  if (!listing.hasTour && !listing.has_tour && !listing.tour_status) return null;
-  return {
-    status: listing.tour_status || 'ready',
-    durationSeconds: listing.tour_duration_seconds,
-    thumbnailUrl: listing.tour_thumbnail_url,
-  };
-}
-
 function automotiveSellerBadge(listing, type) {
   if (type !== 'car') return null;
   if (listing.seller_type === 'dealer') return { label: 'Dealer', variant: 'secondary' };
@@ -152,7 +142,6 @@ export default function ListingCard({
         meta={categoryMeta}
         badges={badges}
         save={{ active: liked, onToggle: toggleLike }}
-        tour={tourSummary(listing)}
         sellerName={listing.seller_name}
         actions={actions}
         layout={layout}

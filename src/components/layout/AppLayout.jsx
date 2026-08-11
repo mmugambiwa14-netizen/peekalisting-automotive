@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { GuestBanner } from '@/components/auth/GuestPromptSheet';
 import ActiveConversationAutoScroll from '@/components/messaging/ActiveConversationAutoScroll';
-import PeekRequestIntentHandler from '@/components/peekThreads/PeekRequestIntentHandler';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import BottomNav from './BottomNav';
@@ -12,14 +11,10 @@ import TopNav from './TopNav';
 const SELF_CONTAINED_ROUTES = [
   '/post',
   '/create',
-  '/property/',
   '/car/',
-  '/machinery/',
   '/service/',
   '/search',
   '/services',
-  '/tours',
-  '/peek',
   '/chats',
   '/messages',
   '/notifications',
@@ -38,8 +33,8 @@ const SELF_CONTAINED_ROUTES = [
 const MOBILE_NAV_ROUTES = new Set([
   '/',
   '/search',
+  '/dealers',
   '/services',
-  '/peek',
   '/chats',
   '/profile',
   '/saved',
@@ -48,7 +43,7 @@ const MOBILE_NAV_ROUTES = new Set([
   '/my-services',
 ]);
 
-const LISTING_DETAIL_PREFIXES = ['/property/', '/car/', '/machinery/', '/service/'];
+const LISTING_DETAIL_PREFIXES = ['/car/', '/service/'];
 
 function matchesRoute(pathname, route) {
   return route.endsWith('/')
@@ -58,10 +53,6 @@ function matchesRoute(pathname, route) {
 
 function isImmersiveDesktopRoute(pathname) {
   return pathname.startsWith('/chats/') || pathname.startsWith('/messages/');
-}
-
-function isImmersivePeekRoute(pathname) {
-  return pathname === '/peek' || pathname.startsWith('/peek/');
 }
 
 function isListingDetailRoute(pathname) {
@@ -75,10 +66,9 @@ export default function AppLayout() {
   const isDiscoverHome = location.pathname === '/';
   const showMobileNav = MOBILE_NAV_ROUTES.has(location.pathname);
   const immersiveConversation = isImmersiveDesktopRoute(location.pathname);
-  const immersivePeek = isImmersivePeekRoute(location.pathname);
   const listingDetail = isListingDetailRoute(location.pathname);
-  const showDesktopNav = !immersiveConversation && !immersivePeek;
-  const showSharedMobileTopBar = !immersiveConversation && !immersivePeek && !listingDetail;
+  const showDesktopNav = !immersiveConversation;
+  const showSharedMobileTopBar = !immersiveConversation && !listingDetail;
 
   return (
     <div className="findit-screen min-h-[100dvh]">
@@ -98,7 +88,6 @@ export default function AppLayout() {
           showMobileNav && 'findit-mobile-nav-clearance',
         )}
       >
-        <PeekRequestIntentHandler />
         <Outlet />
         {isDiscoverHome && <div className="md:hidden"><SiteFooter compact /></div>}
       </main>

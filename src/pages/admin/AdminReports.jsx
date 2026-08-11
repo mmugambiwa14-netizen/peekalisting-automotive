@@ -59,7 +59,7 @@ export default function AdminReports() {
   const [showSupport, setShowSupport] = useState(false);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('pending');
-  const [kind, setKind] = useState('all');
+  const [kind, setKind] = useState('vehicle');
   const pagination = useCursorStack();
   const [decision, setDecision] = useState(null);
   const [notes, setNotes] = useState('');
@@ -114,7 +114,7 @@ export default function AdminReports() {
           <div>
             <h1 className="text-3xl font-bold">Safety reports</h1>
             <p className="mt-1 text-muted-foreground">
-              Investigate user reports and take post-publication safety action. Listings and Peeks do not wait for routine approval.
+              Investigate user reports and take post-publication safety action across Cars, Services and conversations.
             </p>
           </div>
           <Button variant="outline" onClick={() => setShowSupport(true)}>Support requests</Button>
@@ -145,11 +145,7 @@ export default function AdminReports() {
             <Select value={kind} onValueChange={(value) => { setKind(value); pagination.reset(); }}>
               <SelectTrigger aria-label="Filter reports by target type"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="tour">Peeks</SelectItem>
-                <SelectItem value="property">Property</SelectItem>
-                <SelectItem value="vehicle">Vehicles</SelectItem>
-                <SelectItem value="machinery">Machinery</SelectItem>
+                <SelectItem value="vehicle">Cars</SelectItem>
                 <SelectItem value="service">Services</SelectItem>
                 <SelectItem value="message">Messages</SelectItem>
               </SelectContent>

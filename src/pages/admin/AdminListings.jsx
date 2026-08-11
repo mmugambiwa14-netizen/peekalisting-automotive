@@ -43,7 +43,8 @@ export default function AdminListings() {
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 300);
-  const [kind, setKind] = useState(params.get('kind') || 'all');
+  const requestedKind = params.get('kind');
+  const [kind, setKind] = useState(requestedKind === 'service' ? 'service' : 'car');
   const [status, setStatus] = useState('all');
   const pagination = useCursorStack();
   const [decision, setDecision] = useState(null);
@@ -68,10 +69,10 @@ export default function AdminListings() {
   const expectedConfirmation = decision?.action === 'remove' ? 'REMOVE' : decision?.action === 'reject' ? 'REJECT' : '';
 
   return <div className="min-h-[100dvh] bg-background p-4 sm:p-6"><div className="mx-auto max-w-7xl space-y-5">
-    <div><h1 className="text-3xl font-bold">Marketplace</h1><p className="mt-1 text-muted-foreground">Review submitted products and operate product and service adverts.</p></div>
+    <div><h1 className="text-3xl font-bold">Automotive marketplace</h1><p className="mt-1 text-muted-foreground">Review Cars submissions and operate automotive service adverts.</p></div>
     <Card><CardContent className="grid gap-3 pt-5 md:grid-cols-3">
       <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search adverts" className="pl-9" value={query} onChange={(event) => { setQuery(event.target.value); pagination.reset(); }} placeholder="Title, owner, or email" /></div>
-      <Select value={kind} onValueChange={(value) => { setKind(value); pagination.reset(); }}><SelectTrigger aria-label="Filter adverts by type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="property">Property</SelectItem><SelectItem value="car">Vehicles</SelectItem><SelectItem value="machinery">Machinery</SelectItem><SelectItem value="service">Services</SelectItem></SelectContent></Select>
+      <Select value={kind} onValueChange={(value) => { setKind(value); pagination.reset(); }}><SelectTrigger aria-label="Filter automotive items by type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="car">Cars</SelectItem><SelectItem value="service">Services</SelectItem></SelectContent></Select>
       <Select value={status} onValueChange={(value) => { setStatus(value); pagination.reset(); }}><SelectTrigger aria-label="Filter adverts by status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="pending_review">Pending product review</SelectItem><SelectItem value="available">Published products</SelectItem><SelectItem value="rejected">Rejected products</SelectItem><SelectItem value="paused">Paused adverts</SelectItem><SelectItem value="unavailable">Unavailable products</SelectItem><SelectItem value="active">Active services</SelectItem><SelectItem value="sold">Sold</SelectItem><SelectItem value="rented">Rented</SelectItem><SelectItem value="expired">Expired</SelectItem></SelectContent></Select>
     </CardContent></Card>
     {error && <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"><p>{error.message}</p>{error.correlationId && <p className="mt-1 text-xs">Reference: {error.correlationId}</p>}<Button className="mt-3" size="sm" variant="outline" onClick={() => refetch()}>Try again</Button></div>}

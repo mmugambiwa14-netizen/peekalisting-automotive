@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Bell, Building2, ChevronRight, Heart, HelpCircle, LayoutDashboard, ListChecks,
-  LogOut, MessageCircle, MessageSquareMore, ScrollText, Settings, ShieldCheck, Store,
+  LogOut, MessageCircle, ScrollText, Settings, ShieldCheck, Store,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import BackButton from '@/components/layout/BackButton';
@@ -22,7 +22,6 @@ export default function Profile() {
 
   const marketplaceLinks = [
     { icon: ListChecks, label: 'My listings', description: 'Manage vehicles, availability and enquiries', to: '/my-listings' },
-    featureFlags.tours && { icon: MessageSquareMore, label: 'Buyer Peek Requests', description: 'Record visual answers buyers want to see', to: '/peek-requests' },
     { icon: Heart, label: 'Saved', description: 'Vehicles and services you want to revisit', to: '/saved' },
     featureFlags.messaging && { icon: MessageCircle, label: 'Chats', description: 'Private vehicle conversations', to: '/chats' },
     featureFlags.essentialNotifications && { icon: Bell, label: 'Notifications', description: 'Marketplace and account updates', to: '/notifications' },
